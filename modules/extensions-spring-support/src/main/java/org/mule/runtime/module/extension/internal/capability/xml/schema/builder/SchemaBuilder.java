@@ -275,10 +275,6 @@ public final class SchemaBuilder {
     return this;
   }
 
-  Attribute createNameAttribute(boolean required) {
-    return createAttribute(NAME_ATTRIBUTE_NAME, load(String.class), required, NOT_SUPPORTED);
-  }
-
   public SchemaBuilder registerOperation(ComponentModel operationModel) {
     operationSchemaDelegate.registerOperation(operationModel,
                                               dslResolver.resolve(operationModel),
@@ -635,7 +631,7 @@ public final class SchemaBuilder {
       requiresTls = true;
     }
     extensionType.getAttributeOrAttributeGroup()
-        .add(createAttribute(TLS_PARAMETER_NAME, load(String.class), false, NOT_SUPPORTED));
+        .add(createAttribute(TLS_PARAMETER_NAME, typeLoader.load(String.class), false, NOT_SUPPORTED));
   }
 
   void addTlsSupport(ExtensionType extensionType, List<TopLevelElement> childElements) {
@@ -693,10 +689,6 @@ public final class SchemaBuilder {
     doc.getContent().add(content);
     annotation.getAppinfoOrDocumentation().add(doc);
     return annotation;
-  }
-
-  MetadataType load(Class<?> clazz) {
-    return typeLoader.load(clazz);
   }
 
   TopLevelElement createTopLevelElement(String name, BigInteger minOccurs, String maxOccurs) {
