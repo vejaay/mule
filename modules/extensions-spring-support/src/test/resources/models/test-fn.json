@@ -1368,7 +1368,6 @@
                     "allowInlineDefinition": true,
                     "allowTopLevelDefinition": true
                   },
-                  "org.mule.runtime.extension.api.declaration.type.annotation.ComponentIdFieldTypeAnnotation": {},
                   "typeAlias": {
                     "value": "door"
                   }

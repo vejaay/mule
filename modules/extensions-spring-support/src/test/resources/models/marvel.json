@@ -329,22 +329,7 @@
                     "format": "java",
                     "type": "Object",
                     "annotations": {
-                      "typeId": "org.mule.runtime.extension.api.runtime.config.ConfigurationProvider",
-                      "classInformation": {
-                        "classname": "org.mule.runtime.extension.api.runtime.config.ConfigurationProvider",
-                        "hasDefaultConstructor": false,
-                        "isInterface": true,
-                        "isInstantiable": false,
-                        "isAbstract": true,
-                        "isFinal": false,
-                        "implementedInterfaces": [],
-                        "parent": "",
-                        "genericTypes": [],
-                        "isMap": false
-                      },
-                      "typeAlias": {
-                        "value": "ConfigurationProvider"
-                      }
+                      "typeId": "org.mule.runtime.extension.api.runtime.config.ConfigurationProvider"
                     },
                     "fields": []
                   },
@@ -499,22 +484,7 @@
                     "format": "java",
                     "type": "Object",
                     "annotations": {
-                      "typeId": "org.mule.runtime.extension.api.runtime.config.ConfigurationProvider",
-                      "classInformation": {
-                        "classname": "org.mule.runtime.extension.api.runtime.config.ConfigurationProvider",
-                        "hasDefaultConstructor": false,
-                        "isInterface": true,
-                        "isInstantiable": false,
-                        "isAbstract": true,
-                        "isFinal": false,
-                        "implementedInterfaces": [],
-                        "parent": "",
-                        "genericTypes": [],
-                        "isMap": false
-                      },
-                      "typeAlias": {
-                        "value": "ConfigurationProvider"
-                      }
+                      "typeId": "org.mule.runtime.extension.api.runtime.config.ConfigurationProvider"
                     },
                     "fields": []
                   },
@@ -986,22 +956,7 @@
                     "format": "java",
                     "type": "Object",
                     "annotations": {
-                      "typeId": "org.mule.runtime.extension.api.runtime.config.ConfigurationProvider",
-                      "classInformation": {
-                        "classname": "org.mule.runtime.extension.api.runtime.config.ConfigurationProvider",
-                        "hasDefaultConstructor": false,
-                        "isInterface": true,
-                        "isInstantiable": false,
-                        "isAbstract": true,
-                        "isFinal": false,
-                        "implementedInterfaces": [],
-                        "parent": "",
-                        "genericTypes": [],
-                        "isMap": false
-                      },
-                      "typeAlias": {
-                        "value": "ConfigurationProvider"
-                      }
+                      "typeId": "org.mule.runtime.extension.api.runtime.config.ConfigurationProvider"
                     },
                     "fields": []
                   },
@@ -1592,22 +1547,7 @@
                     "format": "java",
                     "type": "Object",
                     "annotations": {
-                      "typeId": "org.mule.runtime.extension.api.runtime.config.ConfigurationProvider",
-                      "classInformation": {
-                        "classname": "org.mule.runtime.extension.api.runtime.config.ConfigurationProvider",
-                        "hasDefaultConstructor": false,
-                        "isInterface": true,
-                        "isInstantiable": false,
-                        "isAbstract": true,
-                        "isFinal": false,
-                        "implementedInterfaces": [],
-                        "parent": "",
-                        "genericTypes": [],
-                        "isMap": false
-                      },
-                      "typeAlias": {
-                        "value": "ConfigurationProvider"
-                      }
+                      "typeId": "org.mule.runtime.extension.api.runtime.config.ConfigurationProvider"
                     },
                     "fields": []
                   },
@@ -1993,22 +1933,7 @@
                     "format": "java",
                     "type": "Object",
                     "annotations": {
-                      "typeId": "org.mule.runtime.extension.api.runtime.config.ConfigurationProvider",
-                      "classInformation": {
-                        "classname": "org.mule.runtime.extension.api.runtime.config.ConfigurationProvider",
-                        "hasDefaultConstructor": false,
-                        "isInterface": true,
-                        "isInstantiable": false,
-                        "isAbstract": true,
-                        "isFinal": false,
-                        "implementedInterfaces": [],
-                        "parent": "",
-                        "genericTypes": [],
-                        "isMap": false
-                      },
-                      "typeAlias": {
-                        "value": "ConfigurationProvider"
-                      }
+                      "typeId": "org.mule.runtime.extension.api.runtime.config.ConfigurationProvider"
                     },
                     "fields": []
                   },
@@ -2584,22 +2509,7 @@
                     "format": "java",
                     "type": "Object",
                     "annotations": {
-                      "typeId": "org.mule.runtime.extension.api.runtime.config.ConfigurationProvider",
-                      "classInformation": {
-                        "classname": "org.mule.runtime.extension.api.runtime.config.ConfigurationProvider",
-                        "hasDefaultConstructor": false,
-                        "isInterface": true,
-                        "isInstantiable": false,
-                        "isAbstract": true,
-                        "isFinal": false,
-                        "implementedInterfaces": [],
-                        "parent": "",
-                        "genericTypes": [],
-                        "isMap": false
-                      },
-                      "typeAlias": {
-                        "value": "ConfigurationProvider"
-                      }
+                      "typeId": "org.mule.runtime.extension.api.runtime.config.ConfigurationProvider"
                     },
                     "fields": []
                   },
@@ -3641,22 +3551,7 @@
                     "format": "java",
                     "type": "Object",
                     "annotations": {
-                      "typeId": "org.mule.runtime.extension.api.runtime.config.ConfigurationProvider",
-                      "classInformation": {
-                        "classname": "org.mule.runtime.extension.api.runtime.config.ConfigurationProvider",
-                        "hasDefaultConstructor": false,
-                        "isInterface": true,
-                        "isInstantiable": false,
-                        "isAbstract": true,
-                        "isFinal": false,
-                        "implementedInterfaces": [],
-                        "parent": "",
-                        "genericTypes": [],
-                        "isMap": false
-                      },
-                      "typeAlias": {
-                        "value": "ConfigurationProvider"
-                      }
+                      "typeId": "org.mule.runtime.extension.api.runtime.config.ConfigurationProvider"
                     },
                     "fields": []
                   },
@@ -4370,22 +4265,7 @@
                     "format": "java",
                     "type": "Object",
                     "annotations": {
-                      "typeId": "org.mule.runtime.extension.api.runtime.config.ConfigurationProvider",
-                      "classInformation": {
-                        "classname": "org.mule.runtime.extension.api.runtime.config.ConfigurationProvider",
-                        "hasDefaultConstructor": false,
-                        "isInterface": true,
-                        "isInstantiable": false,
-                        "isAbstract": true,
-                        "isFinal": false,
-                        "implementedInterfaces": [],
-                        "parent": "",
-                        "genericTypes": [],
-                        "isMap": false
-                      },
-                      "typeAlias": {
-                        "value": "ConfigurationProvider"
-                      }
+                      "typeId": "org.mule.runtime.extension.api.runtime.config.ConfigurationProvider"
                     },
                     "fields": []
                   },
@@ -4522,22 +4402,7 @@
                     "format": "java",
                     "type": "Object",
                     "annotations": {
-                      "typeId": "org.mule.runtime.extension.api.runtime.config.ConfigurationProvider",
-                      "classInformation": {
-                        "classname": "org.mule.runtime.extension.api.runtime.config.ConfigurationProvider",
-                        "hasDefaultConstructor": false,
-                        "isInterface": true,
-                        "isInstantiable": false,
-                        "isAbstract": true,
-                        "isFinal": false,
-                        "implementedInterfaces": [],
-                        "parent": "",
-                        "genericTypes": [],
-                        "isMap": false
-                      },
-                      "typeAlias": {
-                        "value": "ConfigurationProvider"
-                      }
+                      "typeId": "org.mule.runtime.extension.api.runtime.config.ConfigurationProvider"
                     },
                     "fields": []
                   },
