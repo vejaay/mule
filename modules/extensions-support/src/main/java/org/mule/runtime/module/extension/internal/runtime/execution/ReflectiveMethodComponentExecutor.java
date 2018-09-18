@@ -27,6 +27,7 @@ import org.mule.runtime.core.api.MuleContext;
 import org.mule.runtime.core.api.context.MuleContextAware;
 import org.mule.runtime.extension.api.runtime.operation.ExecutionContext;
 import org.mule.runtime.module.extension.internal.runtime.operation.ReflectiveMethodOperationExecutor;
+import org.mule.runtime.module.extension.internal.runtime.resolver.ArgumentResolver;
 
 import org.slf4j.Logger;
 
@@ -49,6 +50,11 @@ public class ReflectiveMethodComponentExecutor<M extends ComponentModel>
   private static class NoArgumentsResolverDelegate implements ArgumentResolverDelegate {
 
     private static final Supplier[] EMPTY = new Supplier[] {};
+
+    @Override
+    public ArgumentResolver<?>[] getArgumentResolvers() {
+      return new ArgumentResolver[] {};
+    }
 
     @Override
     public Supplier<Object>[] resolve(ExecutionContext executionContext, Class<?>[] parameterTypes) {

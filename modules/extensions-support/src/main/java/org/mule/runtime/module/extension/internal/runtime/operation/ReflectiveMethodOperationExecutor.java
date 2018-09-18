@@ -27,6 +27,7 @@ import org.mule.runtime.extension.api.runtime.operation.ExecutionContext;
 import org.mule.runtime.extension.api.runtime.operation.ComponentExecutor;
 import org.mule.runtime.extension.api.runtime.process.CompletionCallback;
 import org.mule.runtime.module.extension.api.runtime.privileged.ExecutionContextAdapter;
+import org.mule.runtime.module.extension.internal.runtime.execution.ByteBuddyWrappedMethodComponentExecutor;
 import org.mule.runtime.module.extension.internal.runtime.execution.OperationArgumentResolverFactory;
 import org.mule.runtime.module.extension.internal.runtime.execution.ReflectiveMethodComponentExecutor;
 
@@ -47,12 +48,13 @@ public class ReflectiveMethodOperationExecutor<M extends ComponentModel>
 
   private static final Logger LOGGER = getLogger(ReflectiveMethodOperationExecutor.class);
 
-  private final ReflectiveMethodComponentExecutor<M> executor;
+  private final ByteBuddyWrappedMethodComponentExecutor<M> executor;
   private MuleContext muleContext;
 
   public ReflectiveMethodOperationExecutor(M operationModel, Method operationMethod, Object operationInstance) {
     executor =
-        new ReflectiveMethodComponentExecutor<>(operationModel.getParameterGroupModels(), operationMethod, operationInstance);
+        new ByteBuddyWrappedMethodComponentExecutor<>(operationModel.getParameterGroupModels(), operationMethod,
+                                                      operationInstance);
   }
 
   /**
