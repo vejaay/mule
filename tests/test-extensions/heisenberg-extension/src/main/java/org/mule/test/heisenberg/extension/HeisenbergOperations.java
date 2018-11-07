@@ -17,13 +17,13 @@ import static org.mule.runtime.extension.api.client.DefaultOperationParameters.b
 import static org.mule.test.heisenberg.extension.HeisenbergExtension.HEISENBERG;
 import static org.mule.test.heisenberg.extension.HeisenbergNotificationAction.KNOCKED_DOOR;
 import static org.mule.test.heisenberg.extension.HeisenbergNotificationAction.KNOCKING_DOOR;
-
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.lifecycle.Disposable;
 import org.mule.runtime.api.metadata.DataType;
 import org.mule.runtime.api.metadata.TypedValue;
 import org.mule.runtime.api.store.ObjectStore;
 import org.mule.runtime.api.streaming.CursorProvider;
+import org.mule.runtime.api.util.MultiMap;
 import org.mule.runtime.core.api.extension.ExtensionManager;
 import org.mule.runtime.core.api.util.IOUtils;
 import org.mule.runtime.extension.api.annotation.Alias;
@@ -74,6 +74,8 @@ import org.mule.test.heisenberg.extension.model.types.IntegerAttributes;
 import org.mule.test.heisenberg.extension.stereotypes.EmpireStereotype;
 import org.mule.test.heisenberg.extension.stereotypes.KillingStereotype;
 
+import com.google.common.collect.ImmutableMap;
+
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.charset.Charset;
@@ -85,8 +87,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import javax.inject.Inject;
-
-import com.google.common.collect.ImmutableMap;
 
 
 @Stereotype(EmpireStereotype.class)
@@ -487,6 +487,13 @@ public class HeisenbergOperations implements Disposable {
     } catch (MuleException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  public MultiMap<String, String> getPhoneNumbers(@Connection HeisenbergConnection connection) {
+    MultiMap<String, String> phones = new MultiMap<>();
+    phones.put("Saul", connection.getSaulPhoneNumber());
+    phones.put("Saul", "16003535");
+    return phones;
   }
 
   public void blockingNonBlocking(CompletionCallback<Void, Void> completionCallback) {}
