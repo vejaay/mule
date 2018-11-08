@@ -133,29 +133,18 @@ public final class DefaultExecutionMediator<T extends ComponentModel> implements
         .flatMap(ctx -> {
           InterceptorsExecutionResult beforeExecutionResult = before(ctx, interceptors);
 
-          // });
-          //
-          //
-          // return Mono.just(before(context, interceptors))
-          // .flatMap(beforeExecutionResult -> {
           Mono<Object> result;
           if (beforeExecutionResult.isOk()) {
             result =
                 from(withContextClassLoader(getClassLoader(ctx.getExtensionModel()), () -> executor.execute(ctx)))
-                    // executedInterceptors.addAll(interceptors);
-                    // return result
                     .map(value -> transform(ctx, value))
                     .doOnSuccess(value -> {
                       onSuccess(ctx, value, interceptors);
                       stats.ifPresent(s -> s.discountInflightOperation());
-                      // sink.success(value);
                     })
                     .onErrorMap(t -> mapError(ctx, interceptors, t));
-            // .subscribe(v -> {
-            // }, sink::error);
           } else {
             result = error(beforeExecutionResult.getThrowable());
-            // executedInterceptors.addAll(beforeExecutionResult.getExecutedInterceptors());
           }
           return result
               .doOnSuccessOrError((value, e) -> {
@@ -171,51 +160,7 @@ public final class DefaultExecutionMediator<T extends ComponentModel> implements
                          e -> extractConnectionException(e).isPresent(),
                          e -> stats.ifPresent(s -> s.discountInflightOperation()),
                          identity(),
-                         context.getCurrentScheduler())))
-
-    ;
-
-
-
-    // List<Interceptor> executedInterceptors = new ArrayList<>(interceptors.size());
-    // // If the operation is retried, then the interceptors need to be executed again,
-    // // so we wrap the mono which executes the operation into another which sets up
-    // // the context and is the one configured with the retry logic
-    // return Mono.create(sink -> {
-    // Mono<Object> result;
-    //
-    // InterceptorsExecutionResult beforeExecutionResult = before(context, interceptors);
-    // if (beforeExecutionResult.isOk()) {
-    // result = from(withContextClassLoader(getClassLoader(context.getExtensionModel()), () -> executor.execute(context)));
-    // executedInterceptors.addAll(interceptors);
-    // } else {
-    // result = error(beforeExecutionResult.getThrowable());
-    // executedInterceptors.addAll(beforeExecutionResult.getExecutedInterceptors());
-    // }
-    //
-    // result.map(value -> transform(context, value))
-    // .doOnSuccess(value -> {
-    // onSuccess(context, value, interceptors);
-    // stats.ifPresent(s -> s.discountInflightOperation());
-    // sink.success(value);
-    // }).onErrorMap(t -> mapError(context, interceptors, t))
-    // .subscribe(v -> {
-    // }, sink::error);
-    // })
-    // .doOnSuccessOrError((value, e) -> {
-    // try {
-    // after(context, value, executedInterceptors);
-    // } finally {
-    // executedInterceptors.clear();
-    // }
-    // })
-    // .transform(pub -> from(getRetryPolicyTemplate(context)
-    // .applyPolicy(pub,
-    // e -> extractConnectionException(e).isPresent(),
-    // e -> stats.ifPresent(s -> s.discountInflightOperation()),
-    // identity(),
-    // context.getCurrentScheduler())))
-    // ;
+                         context.getCurrentScheduler())));
   }
 
   private Throwable mapError(ExecutionContextAdapter context, List<Interceptor> interceptors, Throwable e) {

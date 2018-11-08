@@ -6,11 +6,11 @@
  */
 package org.mule.runtime.core.internal.policy;
 
-import java.util.Map;
-
 import org.mule.runtime.core.api.event.CoreEvent;
 
 import org.reactivestreams.Publisher;
+
+import java.util.Map;
 
 /**
  * Function for executing an operation.
@@ -24,9 +24,7 @@ public interface OperationExecutionFunction {
    * Executes the operation being intercepted by a policy.
    *
    * @param parameters the set of parameters required to execute the function.
-   * @param operationEvent the event to use for executing the operation.
    * @return an {@link CoreEvent} as result of the operation execution.
    */
-  Publisher<CoreEvent> execute(Map<String, Object> parameters, CoreEvent operationEvent);
-
+  Publisher<CoreEvent> execute(Map<String, Object> parameters);
 }

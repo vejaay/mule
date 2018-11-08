@@ -201,19 +201,18 @@ public abstract class ComponentMessageProcessor<T extends ComponentModel> extend
               && ((InternalEvent) event).getInternalParameters().containsKey(INTERCEPTION_RESOLVED_CONTEXT)) {
             ExecutionContextAdapter<T> operationContext = getPrecalculatedContext(event);
 
-            operationExecutionFunction = (parameters, operationEvent) -> {
+            operationExecutionFunction = parameters -> {
               operationContext.setCurrentScheduler(currentScheduler);
-              return doProcessWithErrorMapping(operationEvent, operationContext);
+              return doProcessWithErrorMapping(event, operationContext);
             };
           } else {
-            operationExecutionFunction = (parameters, operationEvent) -> {
-              ExecutionContextAdapter<T> operationContext;
+            operationExecutionFunction = parameters -> {
               try {
-                operationContext = createExecutionContext(configuration, parameters, operationEvent, currentScheduler);
+                return doProcessWithErrorMapping(event,
+                                                 createExecutionContext(configuration, parameters, event, currentScheduler));
               } catch (MuleException e) {
                 return error(e);
               }
-              return doProcessWithErrorMapping(operationEvent, operationContext);
             };
           }
 
@@ -225,7 +224,7 @@ public abstract class ComponentMessageProcessor<T extends ComponentModel> extend
                 .process(event));
           } else {
             // If this operation has no component location then it is internal. Don't apply policies on internal operations.
-            return Mono.from(operationExecutionFunction.execute(resolutionResult, event));
+            return Mono.from(operationExecutionFunction.execute(resolutionResult));
           }
         }));
   }
@@ -239,7 +238,7 @@ public abstract class ComponentMessageProcessor<T extends ComponentModel> extend
    * ReactorCompletionCallback where Mono.error is used but we don't have a reference to the processor there.
    */
   private Publisher<CoreEvent> doProcessWithErrorMapping(CoreEvent operationEvent, ExecutionContextAdapter<T> operationContext) {
-    return doProcess(operationEvent, operationContext)
+    return doProcess(operationContext)
         .onErrorMap(e -> !(e instanceof MessagingException), e -> new MessagingException(operationEvent, e, this));
   }
 
@@ -248,7 +247,7 @@ public abstract class ComponentMessageProcessor<T extends ComponentModel> extend
         .get(INTERCEPTION_RESOLVED_CONTEXT));
   }
 
-  protected Mono<CoreEvent> doProcess(CoreEvent event, ExecutionContextAdapter<T> operationContext) {
+  protected Mono<CoreEvent> doProcess(ExecutionContextAdapter<T> operationContext) {
     return executeOperation(operationContext)
         .map(value -> asReturnValue(operationContext, value))
         .switchIfEmpty(fromCallable(() -> asReturnValue(operationContext, null)))

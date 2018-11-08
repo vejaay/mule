@@ -105,7 +105,7 @@ public class DefaultPolicyManager implements PolicyManager, Initialisable {
 
     List<Policy> parameterizedPolicies = policyProvider.findOperationParameterizedPolicies(operationPointcutParameters);
     if (parameterizedPolicies.isEmpty()) {
-      return (operationEvent) -> operationExecutionFunction.execute(operationParameters, operationEvent);
+      return (operationEvent) -> operationExecutionFunction.execute(operationParameters);
     }
     return new CompositeOperationPolicy(parameterizedPolicies,
                                         lookupOperationParametersTransformer(operation.getLocation().getComponentIdentifier()

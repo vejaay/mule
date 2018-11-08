@@ -12,6 +12,7 @@ import static org.mule.runtime.core.privileged.processor.MessageProcessors.proce
 import static reactor.core.publisher.Mono.error;
 import static reactor.core.publisher.Mono.from;
 import static reactor.core.publisher.Mono.just;
+
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.message.Message;
 import org.mule.runtime.core.api.event.CoreEvent;
@@ -19,12 +20,12 @@ import org.mule.runtime.core.api.policy.OperationPolicyParametersTransformer;
 import org.mule.runtime.core.api.policy.Policy;
 import org.mule.runtime.core.api.processor.Processor;
 
+import org.reactivestreams.Publisher;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-
-import org.reactivestreams.Publisher;
 
 /**
  * {@link OperationPolicy} created from a list of {@link Policy}.
@@ -37,7 +38,7 @@ public class CompositeOperationPolicy extends
     AbstractCompositePolicy<OperationPolicyParametersTransformer, OperationParametersProcessor> implements OperationPolicy {
 
 
-  private final Processor nextOperation;
+  private final OperationPolicyNextProcessor nextOperation;
   private final OperationPolicyProcessorFactory operationPolicyProcessorFactory;
   private CoreEvent nextOperationResponse;
 
@@ -61,31 +62,40 @@ public class CompositeOperationPolicy extends
                                   OperationParametersProcessor operationParametersProcessor,
                                   OperationExecutionFunction operationExecutionFunction) {
     super(parameterizedPolicies, operationPolicyParametersTransformer, operationParametersProcessor);
-    this.nextOperation = new Processor() {
 
-      @Override
-      public CoreEvent process(CoreEvent event) throws MuleException {
-        return processToApply(event, this);
-      }
+    this.nextOperation = operationPolicyParametersTransformer
+        .map(t -> (OperationPolicyNextProcessor) (publisher -> from(publisher)
+            .flatMap(event -> {
+              Map<String, Object> parametersMap = new HashMap<>();
+              try {
+                parametersMap.putAll(operationParametersProcessor.getOperationParameters());
+              } catch (Exception e) {
+                return error(e);
+              }
+              parametersMap.putAll(t.fromMessageToParameters(event.getMessage()));
+              return from(operationExecutionFunction.execute(parametersMap));
+            })))
+        .orElse(publisher -> from(publisher)
+            .transform(eventPublisher -> {
+              Map<String, Object> parametersMap = new HashMap<>();
+              parametersMap.putAll(operationParametersProcessor.getOperationParameters());
+              return operationExecutionFunction.execute(parametersMap);
+            }));
 
-      @Override
-      public Publisher<CoreEvent> apply(Publisher<CoreEvent> publisher) {
-        return from(publisher).flatMap(event -> {
-          Map<String, Object> parametersMap = new HashMap<>();
-          try {
-            parametersMap.putAll(operationParametersProcessor.getOperationParameters());
-          } catch (Exception e) {
-            return error(e);
-          }
-          if (operationPolicyParametersTransformer.isPresent()) {
-            parametersMap
-                .putAll(operationPolicyParametersTransformer.get().fromMessageToParameters(event.getMessage()));
-          }
-          return from(operationExecutionFunction.execute(parametersMap, event));
-        });
-      }
-    };
     this.operationPolicyProcessorFactory = operationPolicyProcessorFactory;
+  }
+
+  @FunctionalInterface
+  private interface OperationPolicyNextProcessor extends Processor {
+
+    @Override
+    default CoreEvent process(CoreEvent event) throws MuleException {
+      return processToApply(event, this);
+    }
+
+    @Override
+    Publisher<CoreEvent> apply(Publisher<CoreEvent> publisher);
+
   }
 
   /**
