@@ -129,16 +129,36 @@ public final class DefaultExecutionMediator<T extends ComponentModel> implements
                                                     ExecutionContextAdapter<T> context,
                                                     final List<Interceptor> interceptors,
                                                     Optional<MutableConfigurationStats> stats) {
-    Publisher<Object> execution =
-        withContextClassLoader(getClassLoader(context.getExtensionModel()), () -> executor.execute(context));
+    // Mono<Object> mediated = Mono.just(context);
+    //
+    // for (Interceptor interceptor : interceptors) {
+    // mediated = mediated.map(ctx -> {
+    // try {
+    // interceptor.before(context);
+    // } catch (Exception e) {
+    // throw exceptionEnricherManager.handleThrowable(e);
+    //// interceptor.after(context, null);
+    // }
+    // return ctx;
+    // })
+    // .doOnSuccessOrError((v, e) -> {
+    // interceptor.after(context, null);
+    // });
+    // }
 
-    return Mono.just(context)
-        .transform(ctxPub -> {
+    Mono<Object> execution =
+        Mono.defer(() -> from(withContextClassLoader(getClassLoader(context.getExtensionModel()),
+                                                     () -> executor.execute(context))));
+    // mediated = mediated.flatMap(ctx -> execution);
+
+
+    return Mono.empty()
+        .compose(emptyPub -> {
           InterceptorsExecutionResult beforeExecutionResult = before(context, interceptors);
 
           Mono<Object> result;
           if (beforeExecutionResult.isOk()) {
-            result = from(execution)
+            result = execution
                 .map(value -> transform(context, value))
                 .doOnSuccess(value -> {
                   onSuccess(context, value, interceptors);
