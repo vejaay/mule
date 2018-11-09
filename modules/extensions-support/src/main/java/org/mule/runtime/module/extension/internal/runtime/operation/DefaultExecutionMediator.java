@@ -132,18 +132,20 @@ public final class DefaultExecutionMediator<T extends ComponentModel> implements
                                                     Optional<MutableConfigurationStats> stats) {
     return empty()
         .compose(emptyPub -> {
+          // If the operation is retried, then the interceptors need to be executed again,
+          // so we wrap the mono which executes the operation into another which sets up
+          // the context and is the one configured with the retry logic
           InterceptorsExecutionResult beforeExecutionResult = before(context, interceptors);
 
           Mono<Object> result;
           if (beforeExecutionResult.isOk()) {
-            result = from(withContextClassLoader(getClassLoader(context.getExtensionModel()),
-                                                 () -> executor.execute(context)))
-                                                     .map(value -> transform(context, value))
-                                                     .doOnSuccess(value -> {
-                                                       onSuccess(context, value, interceptors);
-                                                       stats.ifPresent(s -> s.discountInflightOperation());
-                                                     })
-                                                     .onErrorMap(t -> mapError(context, interceptors, t));
+            result = from(withContextClassLoader(getClassLoader(context.getExtensionModel()), () -> executor.execute(context)))
+                .map(value -> transform(context, value))
+                .doOnSuccess(value -> {
+                  onSuccess(context, value, interceptors);
+                  stats.ifPresent(s -> s.discountInflightOperation());
+                })
+                .onErrorMap(t -> mapError(context, interceptors, t));
           } else {
             result = error(beforeExecutionResult.getThrowable());
           }

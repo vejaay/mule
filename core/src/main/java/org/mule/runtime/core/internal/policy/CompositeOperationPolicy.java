@@ -76,11 +76,8 @@ public class CompositeOperationPolicy extends
               return from(operationExecutionFunction.execute(parametersMap));
             })))
         .orElse(publisher -> from(publisher)
-            .transform(eventPublisher -> {
-              Map<String, Object> parametersMap = new HashMap<>();
-              parametersMap.putAll(operationParametersProcessor.getOperationParameters());
-              return operationExecutionFunction.execute(parametersMap);
-            }));
+            .transform(eventPublisher -> operationExecutionFunction
+                .execute(operationParametersProcessor.getOperationParameters())));
 
     this.operationPolicyProcessorFactory = operationPolicyProcessorFactory;
   }
