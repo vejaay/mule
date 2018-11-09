@@ -129,27 +129,29 @@ public final class DefaultExecutionMediator<T extends ComponentModel> implements
                                                     ExecutionContextAdapter<T> context,
                                                     final List<Interceptor> interceptors,
                                                     Optional<MutableConfigurationStats> stats) {
+    Publisher<Object> execution =
+        withContextClassLoader(getClassLoader(context.getExtensionModel()), () -> executor.execute(context));
+
     return Mono.just(context)
-        .flatMap(ctx -> {
-          InterceptorsExecutionResult beforeExecutionResult = before(ctx, interceptors);
+        .transform(ctxPub -> {
+          InterceptorsExecutionResult beforeExecutionResult = before(context, interceptors);
 
           Mono<Object> result;
           if (beforeExecutionResult.isOk()) {
-            result =
-                from(withContextClassLoader(getClassLoader(ctx.getExtensionModel()), () -> executor.execute(ctx)))
-                    .map(value -> transform(ctx, value))
-                    .doOnSuccess(value -> {
-                      onSuccess(ctx, value, interceptors);
-                      stats.ifPresent(s -> s.discountInflightOperation());
-                    })
-                    .onErrorMap(t -> mapError(ctx, interceptors, t));
+            result = from(execution)
+                .map(value -> transform(context, value))
+                .doOnSuccess(value -> {
+                  onSuccess(context, value, interceptors);
+                  stats.ifPresent(s -> s.discountInflightOperation());
+                })
+                .onErrorMap(t -> mapError(context, interceptors, t));
           } else {
             result = error(beforeExecutionResult.getThrowable());
           }
           return result
               .doOnSuccessOrError((value, e) -> {
                 try {
-                  after(ctx, value, beforeExecutionResult.getExecutedInterceptors());
+                  after(context, value, beforeExecutionResult.getExecutedInterceptors());
                 } finally {
                   beforeExecutionResult.getExecutedInterceptors().clear();
                 }
