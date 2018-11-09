@@ -15,6 +15,7 @@ import static org.mule.runtime.core.api.rx.Exceptions.wrapFatal;
 import static org.mule.runtime.core.api.util.ClassUtils.withContextClassLoader;
 import static org.mule.runtime.core.api.util.ExceptionUtils.extractConnectionException;
 import static org.mule.runtime.module.extension.internal.util.MuleExtensionUtils.getClassLoader;
+import static reactor.core.publisher.Mono.empty;
 import static reactor.core.publisher.Mono.error;
 import static reactor.core.publisher.Mono.from;
 
@@ -129,42 +130,20 @@ public final class DefaultExecutionMediator<T extends ComponentModel> implements
                                                     ExecutionContextAdapter<T> context,
                                                     final List<Interceptor> interceptors,
                                                     Optional<MutableConfigurationStats> stats) {
-    // Mono<Object> mediated = Mono.just(context);
-    //
-    // for (Interceptor interceptor : interceptors) {
-    // mediated = mediated.map(ctx -> {
-    // try {
-    // interceptor.before(context);
-    // } catch (Exception e) {
-    // throw exceptionEnricherManager.handleThrowable(e);
-    //// interceptor.after(context, null);
-    // }
-    // return ctx;
-    // })
-    // .doOnSuccessOrError((v, e) -> {
-    // interceptor.after(context, null);
-    // });
-    // }
-
-    Mono<Object> execution =
-        Mono.defer(() -> from(withContextClassLoader(getClassLoader(context.getExtensionModel()),
-                                                     () -> executor.execute(context))));
-    // mediated = mediated.flatMap(ctx -> execution);
-
-
-    return Mono.empty()
+    return empty()
         .compose(emptyPub -> {
           InterceptorsExecutionResult beforeExecutionResult = before(context, interceptors);
 
           Mono<Object> result;
           if (beforeExecutionResult.isOk()) {
-            result = execution
-                .map(value -> transform(context, value))
-                .doOnSuccess(value -> {
-                  onSuccess(context, value, interceptors);
-                  stats.ifPresent(s -> s.discountInflightOperation());
-                })
-                .onErrorMap(t -> mapError(context, interceptors, t));
+            result = from(withContextClassLoader(getClassLoader(context.getExtensionModel()),
+                                                 () -> executor.execute(context)))
+                                                     .map(value -> transform(context, value))
+                                                     .doOnSuccess(value -> {
+                                                       onSuccess(context, value, interceptors);
+                                                       stats.ifPresent(s -> s.discountInflightOperation());
+                                                     })
+                                                     .onErrorMap(t -> mapError(context, interceptors, t));
           } else {
             result = error(beforeExecutionResult.getThrowable());
           }
