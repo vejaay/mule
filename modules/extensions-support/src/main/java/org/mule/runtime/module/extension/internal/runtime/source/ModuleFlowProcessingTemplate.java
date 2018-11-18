@@ -7,7 +7,9 @@
 package org.mule.runtime.module.extension.internal.runtime.source;
 
 import static org.mule.runtime.core.api.functional.Either.left;
+import static reactor.core.publisher.Mono.from;
 import static reactor.core.publisher.Mono.just;
+
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.message.Message;
 import org.mule.runtime.core.api.event.CoreEvent;
@@ -19,19 +21,20 @@ import org.mule.runtime.core.internal.exception.MessagingException;
 import org.mule.runtime.core.internal.execution.ModuleFlowProcessingPhaseTemplate;
 import org.mule.runtime.core.internal.execution.NotificationFunction;
 
+import org.reactivestreams.Publisher;
+
 import java.util.List;
 import java.util.Map;
-
-import org.reactivestreams.Publisher;
+import java.util.function.Supplier;
 
 final class ModuleFlowProcessingTemplate implements ModuleFlowProcessingPhaseTemplate {
 
-  private final Message message;
+  private final Supplier<Message> message;
   private final Processor messageProcessor;
   private final List<NotificationFunction> notificationFunctions;
   private final SourceCompletionHandler completionHandler;
 
-  ModuleFlowProcessingTemplate(Message message,
+  ModuleFlowProcessingTemplate(Supplier<Message> message,
                                Processor messageProcessor,
                                List<NotificationFunction> notificationFunctions, SourceCompletionHandler completionHandler) {
     this.message = message;
@@ -51,7 +54,7 @@ final class ModuleFlowProcessingTemplate implements ModuleFlowProcessingPhaseTem
   }
 
   @Override
-  public Message getMessage() {
+  public Supplier<Message> getMessage() {
     return message;
   }
 
@@ -68,6 +71,11 @@ final class ModuleFlowProcessingTemplate implements ModuleFlowProcessingPhaseTem
   @Override
   public Publisher<CoreEvent> routeEventAsync(CoreEvent event) {
     return just(event).transform(messageProcessor);
+  }
+
+  @Override
+  public Publisher<CoreEvent> routeEventAsync(Publisher<CoreEvent> eventPub) {
+    return from(eventPub).transform(messageProcessor);
   }
 
   @Override

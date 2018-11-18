@@ -15,10 +15,11 @@ import org.mule.runtime.core.internal.exception.MessagingException;
 import org.mule.runtime.core.internal.policy.MessageSourceResponseParametersProcessor;
 import org.mule.runtime.core.privileged.execution.MessageProcessTemplate;
 
+import org.reactivestreams.Publisher;
+
 import java.util.List;
 import java.util.Map;
-
-import org.reactivestreams.Publisher;
+import java.util.function.Supplier;
 
 /**
  * Template methods for {@link MessageSource} specific behavior during flow execution.
@@ -28,7 +29,7 @@ public interface ModuleFlowProcessingPhaseTemplate extends MessageProcessTemplat
   /**
    * @return a {@link Message} created from the original message
    */
-  Message getMessage();
+  Supplier<Message> getMessage();
 
   /**
    * @return a {@link List} of {@link NotificationFunction} to evaluate and fire
@@ -49,15 +50,23 @@ public interface ModuleFlowProcessingPhaseTemplate extends MessageProcessTemplat
    * Routes the {@link CoreEvent} through the processors chain using async API.
    *
    * @param event {@link CoreEvent} created from the raw message of this context
-   * @return the {@link Publisher} that will ne siganlled on processing completion
+   * @return the {@link Publisher} that will be signaled on processing completion
    */
   Publisher<CoreEvent> routeEventAsync(CoreEvent event);
+
+  /**
+   * Routes the {@link CoreEvent} through the processors chain using async API.
+   *
+   * @param eventPub a {@link Publisher} of the {@link CoreEvent} created from the raw message of this context
+   * @return the {@link Publisher} that will be signaled on processing completion
+   */
+  Publisher<CoreEvent> routeEventAsync(Publisher<CoreEvent> eventPub);
 
   /**
    * Template method to send a response after processing the message.
    * <p>
    * This method is executed within the flow so if it fails it will trigger the exception strategy.
-   * 
+   *
    * @param response the result of the flow execution
    * @param parameters the resolved set of parameters required to send the response.
    * @return void publisher that will signal the success or failure of sending response to client.
@@ -78,7 +87,7 @@ public interface ModuleFlowProcessingPhaseTemplate extends MessageProcessTemplat
    * Template method to be executed after the flow completes it's execution including any policy that may be applied.
    * <p/>
    * This method will always be executed and the {@code either} parameter will indicate the result of the execution.
-   * 
+   *
    * @param either that communicates the result of the flow execution.
    *        <ul>
    *        <li>{@link CoreEvent} if the execution finished correctly</li>

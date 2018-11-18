@@ -10,7 +10,6 @@ import static java.lang.String.format;
 import static java.util.Optional.ofNullable;
 import static java.util.stream.Collectors.toSet;
 import static org.mule.runtime.api.message.Message.of;
-import static org.mule.runtime.api.metadata.MediaType.ANY;
 import static org.mule.runtime.api.metadata.MediaTypeUtils.parseCharset;
 import static org.mule.runtime.api.util.Preconditions.checkArgument;
 import static org.mule.runtime.core.api.util.SystemUtils.getDefaultEncoding;
@@ -40,7 +39,6 @@ import org.mule.runtime.extension.api.runtime.config.ConfigurationInstance;
 import org.mule.runtime.extension.api.runtime.operation.Result;
 import org.mule.runtime.extension.api.runtime.source.SourceCallback;
 import org.mule.runtime.extension.api.runtime.source.SourceCallbackContext;
-import org.mule.runtime.module.extension.internal.loader.java.property.MediaTypeModelProperty;
 import org.mule.runtime.module.extension.internal.runtime.transaction.TransactionSourceBinder;
 
 import java.nio.charset.Charset;
@@ -68,7 +66,7 @@ class DefaultSourceCallback<T, A> implements SourceCallbackAdapter<T, A> {
 
     private Builder() {}
 
-    private DefaultSourceCallback<T, A> product = new DefaultSourceCallback();
+    private final DefaultSourceCallback<T, A> product = new DefaultSourceCallback();
 
     public Builder<T, A> setSourceModel(SourceModel sourceModel) {
       product.sourceModel = sourceModel;
@@ -185,7 +183,7 @@ class DefaultSourceCallback<T, A> implements SourceCallbackAdapter<T, A> {
 
   private DefaultSourceCallback() {}
 
-  private RunOnce resolveInitializationParams = Once.of(() -> {
+  private final RunOnce resolveInitializationParams = Once.of(() -> {
     defaultEncoding = getDefaultEncoding(muleContext);
 
     Map<String, Object> initialisationParameters = messageSource.getInitialisationParameters();
@@ -216,18 +214,19 @@ class DefaultSourceCallback<T, A> implements SourceCallbackAdapter<T, A> {
     SourceCallbackContextAdapter contextAdapter = (SourceCallbackContextAdapter) context;
     validateNotifications(contextAdapter);
     MessageProcessContext messageProcessContext = processContextSupplier.get();
-    MediaType mediaType = resolveMediaType(result);
-    PayloadMediaTypeResolver payloadMediaTypeResolver = new PayloadMediaTypeResolver(getDefaultEncoding(muleContext),
-                                                                                     defaultMediaType,
-                                                                                     encodingParam,
-                                                                                     mimeTypeInitParam);
 
-    SourceResultAdapter resultAdapter =
-        new SourceResultAdapter(result, cursorProviderFactory, mediaType, returnsListOfMessages,
-                                context.getCorrelationId(), payloadMediaTypeResolver);
-    Message message = of(resultAdapter);
+    executeFlow(context, messageProcessContext, () -> {
+      MediaType mediaType = resolveMediaType(result);
+      PayloadMediaTypeResolver payloadMediaTypeResolver = new PayloadMediaTypeResolver(getDefaultEncoding(muleContext),
+                                                                                       defaultMediaType,
+                                                                                       encodingParam,
+                                                                                       mimeTypeInitParam);
 
-    executeFlow(context, messageProcessContext, message);
+      SourceResultAdapter resultAdapter =
+          new SourceResultAdapter(result, cursorProviderFactory, mediaType, returnsListOfMessages,
+                                  context.getCorrelationId(), payloadMediaTypeResolver);
+      return of(resultAdapter);
+    });
     contextAdapter.dispatched();
   }
 
@@ -239,7 +238,8 @@ class DefaultSourceCallback<T, A> implements SourceCallbackAdapter<T, A> {
     });
   }
 
-  private void executeFlow(SourceCallbackContext context, MessageProcessContext messageProcessContext, Message message) {
+  private void executeFlow(SourceCallbackContext context, MessageProcessContext messageProcessContext,
+                           Supplier<Message> message) {
     SourceCallbackContextAdapter contextAdapter = (SourceCallbackContextAdapter) context;
     messageProcessingManager.processMessage(
                                             new ModuleFlowProcessingTemplate(message, listener,

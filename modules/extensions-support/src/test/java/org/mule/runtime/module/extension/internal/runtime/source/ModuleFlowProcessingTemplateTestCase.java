@@ -19,6 +19,7 @@ import static org.mockito.Mockito.when;
 import static reactor.core.publisher.Mono.error;
 import static reactor.core.publisher.Mono.from;
 import static reactor.core.publisher.Mono.just;
+
 import org.mule.runtime.api.message.Message;
 import org.mule.runtime.api.util.Reference;
 import org.mule.runtime.core.api.event.CoreEvent;
@@ -27,14 +28,15 @@ import org.mule.runtime.core.internal.exception.MessagingException;
 import org.mule.tck.junit4.AbstractMuleTestCase;
 import org.mule.tck.size.SmallTest;
 
-import java.util.Map;
-
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
 import org.reactivestreams.Publisher;
+
+import java.util.Map;
+
 import reactor.core.publisher.Mono;
 
 @SmallTest
@@ -59,20 +61,20 @@ public class ModuleFlowProcessingTemplateTestCase extends AbstractMuleTestCase {
   @Mock
   private Map<String, Object> mockParameters;
 
-  private RuntimeException runtimeException = new RuntimeException();
+  private final RuntimeException runtimeException = new RuntimeException();
 
   private ModuleFlowProcessingTemplate template;
 
   @Before
   public void before() throws Exception {
-    template = new ModuleFlowProcessingTemplate(message, messageProcessor, emptyList(), completionHandler);
+    template = new ModuleFlowProcessingTemplate(() -> message, messageProcessor, emptyList(), completionHandler);
     when(completionHandler.onCompletion(any(), any())).thenReturn(Mono.empty());
     when(completionHandler.onFailure(any(), any())).thenReturn(Mono.empty());
   }
 
   @Test
   public void getMuleEvent() throws Exception {
-    assertThat(template.getMessage(), is(sameInstance(message)));
+    assertThat(template.getMessage().get(), is(sameInstance(message)));
   }
 
   @Test

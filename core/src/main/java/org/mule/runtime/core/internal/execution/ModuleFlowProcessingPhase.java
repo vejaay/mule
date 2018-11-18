@@ -103,7 +103,7 @@ public class ModuleFlowProcessingPhase
 
   private final PolicyManager policyManager;
 
-  private List<ReactiveInterceptorSourceCallbackAdapter> additionalInterceptors = new LinkedList<>();
+  private final List<ReactiveInterceptorSourceCallbackAdapter> additionalInterceptors = new LinkedList<>();
 
   @Inject
   private InterceptorManager processorInterceptorManager;
@@ -309,7 +309,7 @@ public class ModuleFlowProcessingPhase
 
   private CoreEvent createEvent(ModuleFlowProcessingPhaseTemplate template, ComponentLocation sourceLocation,
                                 CompletableFuture responseCompletion, FlowConstruct flowConstruct) {
-    Message message = template.getMessage();
+    Message message = template.getMessage().get();
     Builder eventBuilder;
 
     if (message.getPayload().getValue() instanceof SourceResultAdapter) {
