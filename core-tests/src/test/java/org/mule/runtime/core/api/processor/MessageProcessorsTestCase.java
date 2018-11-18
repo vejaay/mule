@@ -19,6 +19,7 @@ import static org.mockito.Mockito.when;
 import static org.mule.runtime.api.message.Message.of;
 import static org.mule.runtime.core.api.event.CoreEvent.builder;
 import static org.mule.runtime.core.api.event.EventContextFactory.create;
+import static org.mule.runtime.core.api.lifecycle.LifecycleUtils.initialiseIfNeeded;
 import static org.mule.runtime.core.privileged.processor.MessageProcessors.newChain;
 import static org.mule.runtime.core.privileged.processor.MessageProcessors.processToApply;
 import static reactor.core.publisher.Mono.empty;
@@ -54,7 +55,7 @@ public class MessageProcessorsTestCase extends AbstractMuleContextTestCase {
   @Rule
   public ExpectedException thrown = ExpectedException.none();
 
-  private RuntimeException exception = new IllegalArgumentException();
+  private final RuntimeException exception = new IllegalArgumentException();
   private OnErrorPropagateHandler exceptionHandler;
   private BaseEventContext eventContext;
   private CoreEvent input;
@@ -88,20 +89,20 @@ public class MessageProcessorsTestCase extends AbstractMuleContextTestCase {
     exceptionHandler.dispose();
   }
 
-  private InternalReactiveProcessor map = publisher -> from(publisher).map(in -> output);
-  private InternalReactiveProcessor ackAndStop = publisher -> from(publisher).flatMap(in -> {
+  private final InternalReactiveProcessor map = publisher -> from(publisher).map(in -> output);
+  private final InternalReactiveProcessor ackAndStop = publisher -> from(publisher).flatMap(in -> {
     ((BaseEventContext) in.getContext()).success();
     return empty();
   });
-  private InternalReactiveProcessor respondAndStop = publisher -> from(publisher).flatMap(in -> {
+  private final InternalReactiveProcessor respondAndStop = publisher -> from(publisher).flatMap(in -> {
     ((BaseEventContext) in.getContext()).success(response);
     return empty();
   });
-  private InternalReactiveProcessor ackAndMap =
+  private final InternalReactiveProcessor ackAndMap =
       publisher -> from(publisher).doOnNext(in -> ((BaseEventContext) in.getContext()).success()).map(in -> output);
-  private InternalReactiveProcessor respondAndMap =
+  private final InternalReactiveProcessor respondAndMap =
       publisher -> from(publisher).doOnNext(in -> ((BaseEventContext) in.getContext()).success(response)).map(in -> output);
-  private InternalReactiveProcessor error = publisher -> from(publisher).map(in -> {
+  private final InternalReactiveProcessor error = publisher -> from(publisher).map(in -> {
     throw exception;
   });
 
@@ -380,7 +381,7 @@ public class MessageProcessorsTestCase extends AbstractMuleContextTestCase {
 
   private Processor createChain(ReactiveProcessor processor) throws InitialisationException {
     MessageProcessorChain chain = newChain(Optional.empty(), new ReactiveProcessorToProcessorAdaptor(processor));
-    chain.setMuleContext(muleContext);
+    initialiseIfNeeded(chain, muleContext);
     return chain;
   }
 

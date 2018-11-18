@@ -25,11 +25,9 @@ import static org.mule.runtime.api.notification.PipelineMessageNotification.PROC
 import static org.mule.runtime.api.notification.PipelineMessageNotification.PROCESS_END;
 import static org.mule.runtime.api.notification.PipelineMessageNotification.PROCESS_START;
 import static org.mule.runtime.core.api.event.EventContextFactory.create;
-import static org.mule.runtime.core.api.lifecycle.LifecycleUtils.disposeIfNeeded;
 import static org.mule.runtime.core.api.lifecycle.LifecycleUtils.stopIfNeeded;
 import static org.mule.runtime.core.api.processor.strategy.AsyncProcessingStrategyFactory.DEFAULT_MAX_CONCURRENCY;
 import static org.mule.tck.util.MuleContextUtils.mockContextWithServices;
-import static org.slf4j.LoggerFactory.getLogger;
 
 import org.mule.runtime.api.component.Component;
 import org.mule.runtime.api.component.ComponentIdentifier;
@@ -124,17 +122,12 @@ public class PipelineMessageNotificationTestCase extends AbstractReactiveProcess
 
   @After
   public void after() throws MuleException {
-    stopIfNeeded(pipeline);
-    disposeIfNeeded(pipeline, getLogger(getClass()));
     stopIfNeeded(muleContext.getSchedulerService());
   }
 
   @Test
   public void send() throws Exception {
     createTestPipeline(emptyList(), null);
-
-    pipeline.initialise();
-    pipeline.start();
 
     event = InternalEvent.builder(context).message(of("request")).build();
 
@@ -162,9 +155,6 @@ public class PipelineMessageNotificationTestCase extends AbstractReactiveProcess
   public void requestResponseException() throws Exception {
     createTestPipeline(singletonList(new ExceptionThrowingMessageProcessor()),
                        new ErrorHandlerFactory().createDefault(notificationFirer));
-
-    pipeline.initialise();
-    pipeline.start();
 
     event = InternalEvent.builder(context).message(of("request")).build();
 
@@ -257,9 +247,9 @@ public class PipelineMessageNotificationTestCase extends AbstractReactiveProcess
 
   private class PipelineMessageNotificiationArgumentMatcher extends ArgumentMatcher<Notification> {
 
-    private int expectedAction;
-    private boolean exceptionExpected;
-    private CoreEvent event;
+    private final int expectedAction;
+    private final boolean exceptionExpected;
+    private final CoreEvent event;
 
     public PipelineMessageNotificiationArgumentMatcher(int expectedAction, boolean exceptionExpected, CoreEvent event) {
       this.expectedAction = expectedAction;

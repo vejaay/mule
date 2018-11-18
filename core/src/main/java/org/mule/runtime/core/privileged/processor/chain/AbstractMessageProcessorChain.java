@@ -36,6 +36,7 @@ import org.mule.runtime.core.api.MuleContext;
 import org.mule.runtime.core.api.context.notification.ServerNotificationManager;
 import org.mule.runtime.core.api.context.thread.notification.ThreadNotificationService;
 import org.mule.runtime.core.api.event.CoreEvent;
+import org.mule.runtime.core.api.execution.ExceptionContextProvider;
 import org.mule.runtime.core.api.processor.Processor;
 import org.mule.runtime.core.api.processor.ReactiveProcessor;
 import org.mule.runtime.core.api.processor.strategy.ProcessingStrategy;
@@ -48,15 +49,18 @@ import org.mule.runtime.core.internal.processor.chain.InterceptedReactiveProcess
 import org.mule.runtime.core.internal.processor.interceptor.ReactiveAroundInterceptorAdapter;
 import org.mule.runtime.core.internal.processor.interceptor.ReactiveInterceptorAdapter;
 import org.mule.runtime.core.internal.util.MessagingExceptionResolver;
+import org.mule.runtime.core.privileged.PrivilegedMuleContext;
 import org.mule.runtime.core.privileged.component.AbstractExecutableComponent;
 import org.mule.runtime.core.privileged.event.BaseEventContext;
 import org.mule.runtime.core.privileged.event.PrivilegedEvent;
+import org.mule.runtime.core.privileged.exception.ErrorTypeLocator;
 
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -108,14 +112,19 @@ abstract class AbstractMessageProcessorChain extends AbstractExecutableComponent
 
   private final String name;
   private final List<Processor> processors;
-  private ProcessingStrategy processingStrategy;
-  private List<ReactiveInterceptorAdapter> additionalInterceptors = new LinkedList<>();
+  private final ProcessingStrategy processingStrategy;
+  private final List<ReactiveInterceptorAdapter> additionalInterceptors = new LinkedList<>();
 
   @Inject
   private InterceptorManager processorInterceptorManager;
 
   @Inject
   private StreamingManager streamingManager;
+
+  private Collection<ExceptionContextProvider> exceptionContextProviders;
+  private ErrorTypeLocator errorTypeLocator;
+
+  private ServerNotificationManager notificationManager;
 
   @Inject
   private ThreadNotificationService threadNotificationService;
@@ -274,7 +283,7 @@ abstract class AbstractMessageProcessorChain extends AbstractExecutableComponent
   private Function<? super Publisher<CoreEvent>, ? extends Publisher<CoreEvent>> doOnNextOrErrorWithContext(Consumer<Context> contextConsumer) {
     return lift((scannable, subscriber) -> new CoreSubscriber<CoreEvent>() {
 
-      private Context context = subscriber.currentContext();
+      private final Context context = subscriber.currentContext();
 
       @Override
       public void onNext(CoreEvent event) {
@@ -308,7 +317,8 @@ abstract class AbstractMessageProcessorChain extends AbstractExecutableComponent
   private MessagingException resolveException(Processor processor, CoreEvent event, Throwable throwable) {
     if (processor instanceof Component) {
       MessagingExceptionResolver exceptionResolver = new MessagingExceptionResolver((Component) processor);
-      return exceptionResolver.resolve(new MessagingException(event, throwable, (Component) processor), muleContext);
+      return exceptionResolver.resolve(new MessagingException(event, throwable, (Component) processor), errorTypeLocator,
+                                       exceptionContextProviders);
     } else {
       return new MessagingException(event, throwable);
     }
@@ -317,7 +327,7 @@ abstract class AbstractMessageProcessorChain extends AbstractExecutableComponent
   private Function<MessagingException, MessagingException> resolveMessagingException(Processor processor) {
     if (processor instanceof Component) {
       MessagingExceptionResolver exceptionResolver = new MessagingExceptionResolver((Component) processor);
-      return exception -> exceptionResolver.resolve(exception, muleContext);
+      return exception -> exceptionResolver.resolve(exception, errorTypeLocator, exceptionContextProviders);
     } else {
       return exception -> exception;
     }
@@ -326,8 +336,7 @@ abstract class AbstractMessageProcessorChain extends AbstractExecutableComponent
   private Consumer<CoreEvent> preNotification(Processor processor) {
     return event -> {
       if (((PrivilegedEvent) event).isNotificationsEnabled()) {
-        fireNotification(muleContext.getNotificationManager(), event, processor, null,
-                         MESSAGE_PROCESSOR_PRE_INVOKE);
+        fireNotification(notificationManager, event, processor, null, MESSAGE_PROCESSOR_PRE_INVOKE);
       }
     };
   }
@@ -335,8 +344,7 @@ abstract class AbstractMessageProcessorChain extends AbstractExecutableComponent
   private Consumer<CoreEvent> postNotification(Processor processor) {
     return event -> {
       if (((PrivilegedEvent) event).isNotificationsEnabled()) {
-        fireNotification(muleContext.getNotificationManager(), event, processor, null,
-                         MESSAGE_PROCESSOR_POST_INVOKE);
+        fireNotification(notificationManager, event, processor, null, MESSAGE_PROCESSOR_POST_INVOKE);
 
       }
     };
@@ -346,9 +354,8 @@ abstract class AbstractMessageProcessorChain extends AbstractExecutableComponent
     return exception -> {
       if (exception instanceof MessagingException
           && ((PrivilegedEvent) ((MessagingException) exception).getEvent()).isNotificationsEnabled()) {
-        fireNotification(muleContext.getNotificationManager(), ((MessagingException) exception).getEvent(), processor,
-                         (MessagingException) exception,
-                         MESSAGE_PROCESSOR_POST_INVOKE);
+        fireNotification(notificationManager, ((MessagingException) exception).getEvent(), processor,
+                         (MessagingException) exception, MESSAGE_PROCESSOR_POST_INVOKE);
       }
     };
   }
@@ -416,6 +423,11 @@ abstract class AbstractMessageProcessorChain extends AbstractExecutableComponent
 
   @Override
   public void initialise() throws InitialisationException {
+    exceptionContextProviders = muleContext.getExceptionContextProviders();
+    errorTypeLocator = ((PrivilegedMuleContext) muleContext).getErrorTypeLocator();
+
+    notificationManager = muleContext.getNotificationManager();
+
     processorInterceptorManager.getInterceptorFactories().stream().forEach(interceptorFactory -> {
       ReactiveInterceptorAdapter reactiveInterceptorAdapter = new ReactiveInterceptorAdapter(interceptorFactory);
       try {

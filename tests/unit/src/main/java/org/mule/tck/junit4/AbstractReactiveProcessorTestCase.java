@@ -15,14 +15,20 @@ import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mule.runtime.api.component.location.ConfigurationComponentLocator.REGISTRY_KEY;
-import static org.mule.runtime.core.api.lifecycle.LifecycleUtils.setMuleContextIfNeeded;
+import static org.mule.runtime.core.api.lifecycle.LifecycleUtils.disposeIfNeeded;
+import static org.mule.runtime.core.api.lifecycle.LifecycleUtils.initialiseIfNeeded;
+import static org.mule.runtime.core.api.lifecycle.LifecycleUtils.startIfNeeded;
+import static org.mule.runtime.core.api.lifecycle.LifecycleUtils.stopIfNeeded;
 import static org.mule.runtime.core.privileged.processor.MessageProcessors.processToApply;
 import static org.mule.tck.junit4.AbstractReactiveProcessorTestCase.Mode.BLOCKING;
 import static org.mule.tck.junit4.AbstractReactiveProcessorTestCase.Mode.NON_BLOCKING;
+import static org.slf4j.LoggerFactory.getLogger;
 
 import org.mule.runtime.api.component.ComponentIdentifier;
 import org.mule.runtime.api.component.location.ConfigurationComponentLocator;
 import org.mule.runtime.api.component.location.Location;
+import org.mule.runtime.api.exception.MuleException;
+import org.mule.runtime.api.exception.MuleRuntimeException;
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.runtime.core.api.construct.Flow;
 import org.mule.runtime.core.api.event.CoreEvent;
@@ -34,7 +40,9 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.reactivestreams.Publisher;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 
 import reactor.core.publisher.Mono;
@@ -54,6 +62,8 @@ public abstract class AbstractReactiveProcessorTestCase extends AbstractMuleCont
 
   protected ConfigurationComponentLocator configurationComponentLocator =
       mock(ConfigurationComponentLocator.class, RETURNS_DEEP_STUBS.get());
+
+  private final List<Processor> startedProcessors = new ArrayList<>();
 
   public AbstractReactiveProcessorTestCase(Mode mode) {
     this.mode = mode;
@@ -80,6 +90,15 @@ public abstract class AbstractReactiveProcessorTestCase extends AbstractMuleCont
 
   @Override
   protected void doTearDown() throws Exception {
+    startedProcessors.forEach(p -> {
+      try {
+        stopIfNeeded(p);
+      } catch (MuleException e) {
+        throw new MuleRuntimeException(e);
+      }
+      disposeIfNeeded(p, getLogger(getClass()));
+    });
+
     scheduler.stop();
     super.doTearDown();
   }
@@ -90,7 +109,12 @@ public abstract class AbstractReactiveProcessorTestCase extends AbstractMuleCont
   }
 
   protected CoreEvent process(Processor processor, CoreEvent event, boolean unwrapMessagingException) throws Exception {
-    setMuleContextIfNeeded(processor, muleContext);
+    if (!startedProcessors.contains(processor)) {
+      initialiseIfNeeded(processor, muleContext);
+      startIfNeeded(processor);
+      startedProcessors.add(processor);
+    }
+
     try {
       switch (mode) {
         case BLOCKING:

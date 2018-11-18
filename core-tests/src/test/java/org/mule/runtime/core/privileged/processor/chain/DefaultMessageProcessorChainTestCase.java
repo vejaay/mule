@@ -96,6 +96,7 @@ import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.reactivestreams.Publisher;
+import org.slf4j.Logger;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -108,10 +109,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 @SuppressWarnings("deprecation")
 public class DefaultMessageProcessorChainTestCase extends AbstractReactiveProcessorTestCase {
 
+  private static final Logger LOGGER = getLogger(DefaultMessageProcessorChainTestCase.class);
+
   protected MuleContext muleContext;
 
-  private AtomicInteger nonBlockingProcessorsExecuted = new AtomicInteger(0);
-  private ProcessingStrategyFactory processingStrategyFactory;
+  private final AtomicInteger nonBlockingProcessorsExecuted = new AtomicInteger(0);
+  private final ProcessingStrategyFactory processingStrategyFactory;
   private final RuntimeException illegalStateException = new IllegalStateException();
 
   @Rule
@@ -661,8 +664,6 @@ public class DefaultMessageProcessorChainTestCase extends AbstractReactiveProces
     scatterGatherRouter
         .setRoutes(asList(newChain(empty(), getAppendingMP("1")), newChain(empty(), getAppendingMP("2")),
                           newChain(empty(), getAppendingMP("3"))));
-    initialiseIfNeeded(scatterGatherRouter, true, muleContext);
-    scatterGatherRouter.start();
 
     CoreEvent event = getTestEventUsingFlow("0");
     final MessageProcessorChain chain = newChain(empty(), singletonList(scatterGatherRouter));
@@ -671,9 +672,6 @@ public class DefaultMessageProcessorChainTestCase extends AbstractReactiveProces
     Map<String, Message> resultMessage = (Map<String, Message>) result.getPayload().getValue();
     assertThat(resultMessage.values().stream().map(msg -> msg.getPayload().getValue()).collect(toList()).toArray(),
                is(equalTo(new String[] {"01", "02", "03"})));
-
-    scatterGatherRouter.stop();
-    scatterGatherRouter.dispose();
   }
 
   @Test
@@ -808,9 +806,6 @@ public class DefaultMessageProcessorChainTestCase extends AbstractReactiveProces
 
   @Override
   protected CoreEvent process(Processor messageProcessor, CoreEvent event) throws Exception {
-    if (messageProcessor instanceof MuleContextAware) {
-      ((MuleContextAware) messageProcessor).setMuleContext(muleContext);
-    }
     try {
       return super.process(messageProcessor, event);
     } finally {
@@ -941,7 +936,7 @@ public class DefaultMessageProcessorChainTestCase extends AbstractReactiveProces
     boolean started;
     boolean stopped;
     boolean disposed;
-    private boolean stopProcessing;
+    private final boolean stopProcessing;
     boolean invoked;
 
     public AppendingInterceptingMP(String appendString) {
@@ -1061,7 +1056,7 @@ public class DefaultMessageProcessorChainTestCase extends AbstractReactiveProces
 
   public static class ExceptionThrowingMessageProcessor extends AbstractComponent implements Processor, InternalProcessor {
 
-    private Exception exception;
+    private final Exception exception;
 
     public ExceptionThrowingMessageProcessor(Exception exception) {
       this.exception = exception;

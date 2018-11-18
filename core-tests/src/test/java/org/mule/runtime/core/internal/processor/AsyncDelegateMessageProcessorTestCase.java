@@ -52,7 +52,7 @@ public class AsyncDelegateMessageProcessorTestCase extends AbstractReactiveProce
   protected TestListener target = new TestListener();
   private Exception exceptionThrown;
   protected Latch latch = new Latch();
-  private Latch asyncEntryLatch = new Latch();
+  private final Latch asyncEntryLatch = new Latch();
   private Flow flow;
 
   @Rule
@@ -74,14 +74,10 @@ public class AsyncDelegateMessageProcessorTestCase extends AbstractReactiveProce
     flow = createAndRegisterFlow(muleContext, APPLE_FLOW, componentLocator);
 
     messageProcessor = createAsyncDelegateMessageProcessor(target, flow);
-    messageProcessor.start();
   }
 
   @Override
   protected void doTearDown() throws Exception {
-    messageProcessor.stop();
-    messageProcessor.dispose();
-
     flow.dispose();
     super.doTearDown();
   }
@@ -187,7 +183,7 @@ public class AsyncDelegateMessageProcessorTestCase extends AbstractReactiveProce
 
     AsyncDelegateMessageProcessor mp = new AsyncDelegateMessageProcessor(delegateBuilder, "thread");
     mp.setAnnotations(getAppleFlowComponentLocationAnnotations());
-    initialiseIfNeeded(mp, true, muleContext);
+    initialiseIfNeeded(mp, muleContext);
     return mp;
   }
 
