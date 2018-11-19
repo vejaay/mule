@@ -55,14 +55,6 @@ public interface ModuleFlowProcessingPhaseTemplate extends MessageProcessTemplat
   Publisher<CoreEvent> routeEventAsync(CoreEvent event);
 
   /**
-   * Routes the {@link CoreEvent} through the processors chain using async API.
-   *
-   * @param eventPub a {@link Publisher} of the {@link CoreEvent} created from the raw message of this context
-   * @return the {@link Publisher} that will be signaled on processing completion
-   */
-  Publisher<CoreEvent> routeEventAsync(Publisher<CoreEvent> eventPub);
-
-  /**
    * Template method to send a response after processing the message.
    * <p>
    * This method is executed within the flow so if it fails it will trigger the exception strategy.

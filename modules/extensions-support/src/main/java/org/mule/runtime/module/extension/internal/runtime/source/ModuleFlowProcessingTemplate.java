@@ -7,7 +7,6 @@
 package org.mule.runtime.module.extension.internal.runtime.source;
 
 import static org.mule.runtime.core.api.functional.Either.left;
-import static reactor.core.publisher.Mono.from;
 import static reactor.core.publisher.Mono.just;
 
 import org.mule.runtime.api.exception.MuleException;
@@ -71,11 +70,6 @@ final class ModuleFlowProcessingTemplate implements ModuleFlowProcessingPhaseTem
   @Override
   public Publisher<CoreEvent> routeEventAsync(CoreEvent event) {
     return just(event).transform(messageProcessor);
-  }
-
-  @Override
-  public Publisher<CoreEvent> routeEventAsync(Publisher<CoreEvent> eventPub) {
-    return from(eventPub).transform(messageProcessor);
   }
 
   @Override
