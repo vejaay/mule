@@ -15,6 +15,7 @@ import org.mule.util.IOUtils;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
 
 /**
  * <code>ObjectToByteArray</code> converts serilaizable object to a byte array but
@@ -52,7 +53,8 @@ public class ObjectToByteArray extends SerializableToByteArray
                 {
                     is.close();
                 }
-                return byteOut.toByteArray();
+
+                return getBytesOfOutputStream(byteOut, outputEncoding);
             }
             else if (src instanceof OutputHandler)
             {
@@ -76,5 +78,19 @@ public class ObjectToByteArray extends SerializableToByteArray
         }
 
         return super.doTransform(src, outputEncoding);
+    }
+
+    private byte[] getBytesOfOutputStream(ByteArrayOutputStream byteOut, String outputEncoding) throws UnsupportedEncodingException
+    {
+        // Only perform this transformation if an explicit encoding was set by the user
+        // the bytes are transformed to a string with the defined output encoding.
+        if (encoding != null)
+        {
+            return byteOut.toString(outputEncoding).getBytes();
+        }
+        else
+        {
+            return byteOut.toByteArray();
+        }
     }
 }
