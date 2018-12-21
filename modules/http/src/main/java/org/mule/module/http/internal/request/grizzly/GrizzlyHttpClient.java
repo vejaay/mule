@@ -9,6 +9,7 @@ package org.mule.module.http.internal.request.grizzly;
 import static com.ning.http.client.Realm.AuthScheme.NTLM;
 import static com.ning.http.client.providers.grizzly.GrizzlyAsyncHttpProviderConfig.Property.MAX_HTTP_PACKET_HEADER_SIZE;
 import static java.lang.Boolean.getBoolean;
+import static java.lang.Integer.parseInt;
 import static java.lang.Integer.valueOf;
 import static java.lang.System.getProperty;
 import static org.glassfish.grizzly.http.HttpCodecFilter.DEFAULT_MAX_HTTP_PACKET_HEADER_SIZE;
@@ -136,8 +137,7 @@ public class GrizzlyHttpClient implements HttpClient
     private AsyncHttpClient asyncHttpClient;
     private SSLContext sslContext;
     private boolean avoidZeroContentLength = getBoolean(AVOID_ZERO_CONTENT_LENGTH);
-    private boolean streamRequest = getBoolean(STREAM_REQUEST);
-    private Integer streamingStrategyThreshold = Integer.parseInt(System.getProperty(STREAMING_STRATEGY_THRESHOLD));
+    private Integer streamingStrategyThreshold = parseInt(getProperty(STREAMING_STRATEGY_THRESHOLD));
 
     public GrizzlyHttpClient(HttpClientConfiguration config)
     {
@@ -537,7 +537,8 @@ public class GrizzlyHttpClient implements HttpClient
                             // Use Grizzly AHC default streaming strategy
                             bodyGenerator = new InputStreamBodyGenerator(inputStream);
                         }
-                        else {
+                        else
+                        {
                             // Big payload size. Use Feeder strategy.
                             // Removing streaming property check. Always stream input stream requests
 
