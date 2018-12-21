@@ -113,6 +113,7 @@ public class GrizzlyHttpClient implements HttpClient
             CONTENT_ID.toLowerCase());
 
     public static final String HOST_SEPARATOR = ",";
+    public static final String STREAMING_STRATEGY_THRESHOLD = SYSTEM_PROPERTY_PREFIX + ".http.client.streamingStrategyThreshold";
 
     private final TlsContextFactory tlsContextFactory;
     private final TlsContextFactory defaultTlsContextFactory;
@@ -136,6 +137,7 @@ public class GrizzlyHttpClient implements HttpClient
     private SSLContext sslContext;
     private boolean avoidZeroContentLength = getBoolean(AVOID_ZERO_CONTENT_LENGTH);
     private boolean streamRequest = getBoolean(STREAM_REQUEST);
+    private Integer streamingStrategyThreshold = Integer.parseInt(System.getProperty(STREAMING_STRATEGY_THRESHOLD));
 
     public GrizzlyHttpClient(HttpClientConfiguration config)
     {
@@ -524,15 +526,27 @@ public class GrizzlyHttpClient implements HttpClient
                 {
                     if (request.getEntity() instanceof InputStreamHttpEntity)
                     {
-                        // Removing streaming property check. Always stream input stream requests
                         BodyGenerator bodyGenerator;
                         InputStream inputStream = ((InputStreamHttpEntity) request.getEntity()).getInputStream();
 
-                        FeedableBodyGenerator feedableBodyGenerator = new FeedableBodyGenerator();
-                        FeedableBodyGenerator.NonBlockingInputStreamFeeder feeder = new FeedableBodyGenerator.NonBlockingInputStreamFeeder(feedableBodyGenerator, inputStream);
-                        feedableBodyGenerator.setFeeder(feeder);
+                        // TODO: Refactor this into some kind of StreamingStrategySelector
+                        // The check if either the Content-Length property is configured or not can be done inside this object,
+                        // and have some kind of fallback in the latter case.
+                        if (((InputStreamHttpEntity) request.getEntity()).getContentLength() <= streamingStrategyThreshold)
+                        {
+                            // Use Grizzly AHC default streaming strategy
+                            bodyGenerator = new InputStreamBodyGenerator(inputStream);
+                        }
+                        else {
+                            // Big payload size. Use Feeder strategy.
+                            // Removing streaming property check. Always stream input stream requests
 
-                        bodyGenerator = feedableBodyGenerator;
+                            FeedableBodyGenerator feedableBodyGenerator = new FeedableBodyGenerator();
+                            FeedableBodyGenerator.NonBlockingInputStreamFeeder feeder = new FeedableBodyGenerator.NonBlockingInputStreamFeeder(feedableBodyGenerator, inputStream);
+                            feedableBodyGenerator.setFeeder(feeder);
+
+                            bodyGenerator = feedableBodyGenerator;
+                        }
 
                         builder.setBody(bodyGenerator);
                     }
