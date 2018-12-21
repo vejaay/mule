@@ -59,6 +59,7 @@ import com.ning.http.client.AsyncHandler;
 import com.ning.http.client.AsyncHttpClient;
 import com.ning.http.client.AsyncHttpClientConfig;
 import com.ning.http.client.BodyDeferringAsyncHandler;
+import com.ning.http.client.BodyGenerator;
 import com.ning.http.client.HttpResponseBodyPart;
 import com.ning.http.client.HttpResponseHeaders;
 import com.ning.http.client.HttpResponseStatus;
@@ -70,6 +71,7 @@ import com.ning.http.client.RequestBuilder;
 import com.ning.http.client.Response;
 import com.ning.http.client.generators.InputStreamBlockingBodyGenerator;
 import com.ning.http.client.generators.InputStreamBodyGenerator;
+import com.ning.http.client.providers.grizzly.FeedableBodyGenerator;
 import com.ning.http.client.providers.grizzly.GrizzlyAsyncHttpProvider;
 import com.ning.http.client.providers.grizzly.GrizzlyAsyncHttpProviderConfig;
 
@@ -522,16 +524,16 @@ public class GrizzlyHttpClient implements HttpClient
                 {
                     if (request.getEntity() instanceof InputStreamHttpEntity)
                     {
-                        InputStreamBodyGenerator bodyGenerator;
+                        // Removing streaming property check. Always stream input stream requests
+                        BodyGenerator bodyGenerator;
                         InputStream inputStream = ((InputStreamHttpEntity) request.getEntity()).getInputStream();
-                        if (streamRequest)
-                        {
-                            bodyGenerator = new InputStreamBlockingBodyGenerator(inputStream);
-                        }
-                        else
-                        {
-                            bodyGenerator = new InputStreamBodyGenerator(inputStream);
-                        }
+
+                        FeedableBodyGenerator feedableBodyGenerator = new FeedableBodyGenerator();
+                        FeedableBodyGenerator.NonBlockingInputStreamFeeder feeder = new FeedableBodyGenerator.NonBlockingInputStreamFeeder(feedableBodyGenerator, inputStream);
+                        feedableBodyGenerator.setFeeder(feeder);
+
+                        bodyGenerator = feedableBodyGenerator;
+
                         builder.setBody(bodyGenerator);
                     }
                     else if (request.getEntity() instanceof ByteArrayHttpEntity)
