@@ -267,7 +267,22 @@ public class MuleEventToHttpRequest
 
             if (payload instanceof InputStream)
             {
-                return new InputStreamHttpEntity((InputStream) payload);
+                // If Content-Length is set as an inbound property in the muleEvent, it means it was configured by the
+                // listener whose request is being processed. Use it as an InputStreamHttpEntity property.
+                // TODO: This is only valid when the payload remains untouched in the incomign muleEvent.
+                String inboundContentLength = muleEvent.getMessage().getInboundProperty("content-length");
+                if (inboundContentLength != null)
+                {
+                    if (logger.isDebugEnabled())
+                    {
+                        logger.debug("Found a content length inbound property in the incoming message with value: ", inboundContentLength);
+                    }
+                    return new InputStreamHttpEntity(Integer.parseInt(inboundContentLength), (InputStream) payload);
+                }
+                else
+                {
+                    return new InputStreamHttpEntity((InputStream) payload);
+                }
             }
             else
             {
