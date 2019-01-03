@@ -37,15 +37,15 @@ public class SimpleUnitTestSupportSchedulerService implements SchedulerService, 
 
   public static final ThreadGroup UNIT_TEST_THREAD_GROUP = new ThreadGroup(SimpleUnitTestSupportScheduler.class.getSimpleName());
 
-  private SimpleUnitTestSupportScheduler scheduler =
+  private final SimpleUnitTestSupportScheduler scheduler =
       new SimpleUnitTestSupportScheduler(8,
                                          new NamedThreadFactory(SimpleUnitTestSupportScheduler.class.getSimpleName(),
                                                                 SimpleUnitTestSupportSchedulerService.class.getClassLoader(),
                                                                 UNIT_TEST_THREAD_GROUP),
                                          new AbortPolicy());
 
-  private List<Scheduler> customSchedulers = synchronizedList(new ArrayList<>());
-  private List<Scheduler> decorators = synchronizedList(new ArrayList<>());
+  private final List<Scheduler> customSchedulers = synchronizedList(new ArrayList<>());
+  private final List<Scheduler> decorators = synchronizedList(new ArrayList<>());
 
   @Override
   public String getName() {
@@ -162,7 +162,7 @@ public class SimpleUnitTestSupportSchedulerService implements SchedulerService, 
     return spied;
   }
 
-  private String resolveSchedulerCreationLocation() {
+  protected String resolveSchedulerCreationLocation() {
     int i = 0;
     final StackTraceElement[] stackTrace = new Throwable().getStackTrace();
     StackTraceElement ste = stackTrace[i++];
@@ -232,7 +232,7 @@ public class SimpleUnitTestSupportSchedulerService implements SchedulerService, 
 
   private class TestSchedulerView implements SchedulerView {
 
-    private Scheduler scheduler;
+    private final Scheduler scheduler;
 
     /**
      * Creates a reporting view for a {@link Scheduler}.

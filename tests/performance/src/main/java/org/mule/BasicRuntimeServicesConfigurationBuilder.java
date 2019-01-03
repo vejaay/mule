@@ -16,6 +16,9 @@ import org.mule.runtime.api.service.Service;
 import org.mule.runtime.core.api.MuleContext;
 import org.mule.runtime.core.api.config.builders.AbstractConfigurationBuilder;
 import org.mule.runtime.core.api.registry.SpiServiceRegistry;
+import org.mule.tck.SimpleUnitTestSupportLifecycleSchedulerDecorator;
+import org.mule.tck.SimpleUnitTestSupportScheduler;
+import org.mule.tck.SimpleUnitTestSupportSchedulerService;
 import org.mule.weave.v2.el.WeaveDefaultExpressionLanguageFactoryService;
 
 /**
@@ -39,5 +42,15 @@ public class BasicRuntimeServicesConfigurationBuilder extends AbstractConfigurat
 
     DefaultExpressionLanguageFactoryService weaveExpressionExecutor = new WeaveDefaultExpressionLanguageFactoryService(null);
     registerObject(muleContext, weaveExpressionExecutor.getName(), weaveExpressionExecutor);
+
+    final SimpleUnitTestSupportSchedulerService schedulerService = new SimpleUnitTestSupportSchedulerService() {
+
+      @Override
+      protected SimpleUnitTestSupportLifecycleSchedulerDecorator decorateScheduler(SimpleUnitTestSupportScheduler scheduler) {
+        // Avoid the mockito spying which would consume all the memory
+        return new SimpleUnitTestSupportLifecycleSchedulerDecorator(resolveSchedulerCreationLocation(), scheduler, this);
+      }
+    };
+    registerObject(muleContext, schedulerService.getName(), schedulerService);
   }
 }
