@@ -257,8 +257,8 @@ public class ProactorStreamEmitterProcessingStrategyTestCase extends AbstractPro
     flow.initialise();
     flow.start();
     processFlow(testEvent());
-    verify(rejectingSchedulerSpy, times(12)).submit(any(Callable.class));
-    verify(blockingSchedulerSpy, times(2)).submit(any(Callable.class));
+    verify(rejectingSchedulerSpy, times(11)).submit(any(Callable.class));
+    verify(blockingSchedulerSpy, times(1)).submit(any(Callable.class));
     assertThat(threads, hasSize(1));
     assertThat(threads.stream().filter(name -> name.startsWith(IO)).count(), equalTo(1l));
     assertThat(threads, not(hasItem(startsWith(CPU_LIGHT))));
@@ -286,8 +286,8 @@ public class ProactorStreamEmitterProcessingStrategyTestCase extends AbstractPro
     flow.initialise();
     flow.start();
     processFlow(testEvent());
-    verify(rejectingSchedulerSpy, times(12)).submit(any(Callable.class));
-    verify(cpuIntensiveSchedulerSpy, times(2)).submit(any(Callable.class));
+    verify(rejectingSchedulerSpy, times(11)).submit(any(Callable.class));
+    verify(cpuIntensiveSchedulerSpy, times(1)).submit(any(Callable.class));
     assertThat(threads, hasSize(1));
     assertThat(threads.stream().filter(name -> name.startsWith(CPU_INTENSIVE)).count(), equalTo(1l));
     assertThat(threads, not(hasItem(startsWith(CPU_LIGHT))));

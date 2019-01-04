@@ -30,7 +30,6 @@ import org.mule.runtime.core.api.event.CoreEvent;
 import org.mule.runtime.core.api.processor.ReactiveProcessor;
 import org.mule.runtime.core.privileged.event.BaseEventContext;
 
-import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 
 import java.util.concurrent.RejectedExecutionException;
@@ -107,7 +106,7 @@ public abstract class ProactorStreamProcessingStrategy
     }
   }
 
-  protected ReactiveProcessor proactor(ReactiveProcessor processor, Scheduler scheduler) {
+  private ReactiveProcessor proactor(ReactiveProcessor processor, Scheduler scheduler) {
     return publisher -> from(publisher).flatMap(event -> {
       if (processor.getProcessingType() == IO_RW && !scheduleIoRwEvent(event)) {
         // If payload is not a stream o length is < STREAM_PAYLOAD_BLOCKING_IO_THRESHOLD (default 16KB) perform processing on
@@ -116,7 +115,7 @@ public abstract class ProactorStreamProcessingStrategy
             .transform(processor)
             .subscriberContext(ctx -> ctx.put(PROCESSOR_SCHEDULER_CONTEXT_KEY, getCpuLightScheduler()));
       } else {
-        return withRetry(scheduleProcessor(processor, scheduler, just(event))
+        return withRetry(scheduleProcessor(processor, scheduler, event)
             .subscriberContext(ctx -> ctx.put(PROCESSOR_SCHEDULER_CONTEXT_KEY, scheduler)), scheduler);
       }
     }, max(maxConcurrency / (getParallelism() * subscribers), 1));
@@ -128,9 +127,9 @@ public abstract class ProactorStreamProcessingStrategy
   }
 
   protected abstract Flux<CoreEvent> scheduleProcessor(ReactiveProcessor processor, Scheduler processorScheduler,
-                                                       Publisher<CoreEvent> eventPub);
+                                                       CoreEvent event);
 
-  protected final Flux<CoreEvent> withRetry(Flux<CoreEvent> scheduledFlux, Scheduler processorScheduler) {
+  private Flux<CoreEvent> withRetry(Flux<CoreEvent> scheduledFlux, Scheduler processorScheduler) {
     return scheduledFlux.retryWhen(onlyIf(ctx -> {
       final boolean schedulerBusy = isSchedulerBusy(ctx.exception());
       if (schedulerBusy) {
@@ -209,11 +208,6 @@ public abstract class ProactorStreamProcessingStrategy
     @Override
     public final void dispose() {
       innerSink.dispose();
-    }
-
-    @Override
-    public boolean isCancelled() {
-      return innerSink.isCancelled();
     }
   }
 }
