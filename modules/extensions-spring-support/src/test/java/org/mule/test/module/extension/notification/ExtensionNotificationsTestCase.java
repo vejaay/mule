@@ -12,6 +12,7 @@ import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.Assert.assertThat;
+
 import org.mule.runtime.api.notification.ExtensionNotification;
 import org.mule.runtime.api.notification.ExtensionNotificationListener;
 import org.mule.runtime.api.notification.NotificationListenerRegistry;
@@ -19,6 +20,7 @@ import org.mule.runtime.api.util.MultiMap;
 import org.mule.runtime.api.util.Reference;
 import org.mule.runtime.api.util.concurrent.Latch;
 import org.mule.runtime.core.api.construct.Flow;
+import org.mule.tck.junit4.FlakyTest;
 import org.mule.tck.probe.PollingProber;
 import org.mule.tck.probe.Probe;
 import org.mule.test.heisenberg.extension.HeisenbergExtension;
@@ -26,14 +28,14 @@ import org.mule.test.heisenberg.extension.model.PersonalInfo;
 import org.mule.test.heisenberg.extension.model.SimpleKnockeableDoor;
 import org.mule.test.module.extension.AbstractExtensionFunctionalTestCase;
 
+import org.junit.Test;
+
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 
 import javax.inject.Inject;
-
-import org.junit.Test;
 
 public class ExtensionNotificationsTestCase extends AbstractExtensionFunctionalTestCase {
 
@@ -155,6 +157,7 @@ public class ExtensionNotificationsTestCase extends AbstractExtensionFunctionalT
   }
 
   @Test
+  @FlakyTest
   public void sourceFiresNotificationsOnBackPressure() throws Exception {
     Latch failed = new Latch();
     final Reference<ExtensionNotification> batchFailed = new Reference<>();
@@ -235,8 +238,8 @@ public class ExtensionNotificationsTestCase extends AbstractExtensionFunctionalT
 
   private class TestExtensionNotificationListener implements ExtensionNotificationListener {
 
-    private Consumer<ExtensionNotification> onNotification;
-    private MultiMap<String, ExtensionNotification> notifications = new MultiMap<>();
+    private final Consumer<ExtensionNotification> onNotification;
+    private final MultiMap<String, ExtensionNotification> notifications = new MultiMap<>();
     private Map<String, Integer> correlationCount;
 
     public TestExtensionNotificationListener(Consumer<ExtensionNotification> onNotification, boolean correlationOn) {

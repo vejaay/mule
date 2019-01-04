@@ -22,6 +22,7 @@ import org.mule.runtime.core.api.MuleContext;
 import org.mule.runtime.core.api.processor.strategy.ProcessingStrategy;
 import org.mule.runtime.core.api.transaction.TransactionCoordination;
 import org.mule.runtime.core.internal.processor.strategy.TransactionAwareProactorStreamWorkQueueProcessingStrategyFactory.TransactionAwareProactorStreamWorkQueueProcessingStrategy;
+import org.mule.tck.junit4.FlakyTest;
 import org.mule.tck.testmodels.mule.TestTransaction;
 
 import io.qameta.allure.Description;
@@ -68,4 +69,9 @@ public class TransactionAwareProactorStreamWorkQueueProcessingStrategyTestCase
     assertThat(threads, not(hasItem(startsWith(CUSTOM))));
   }
 
+  @FlakyTest
+  @Override
+  public void backpressureOnInnerCpuIntensiveSchedulerBusy() throws Exception {
+    super.backpressureOnInnerCpuIntensiveSchedulerBusy();
+  }
 }

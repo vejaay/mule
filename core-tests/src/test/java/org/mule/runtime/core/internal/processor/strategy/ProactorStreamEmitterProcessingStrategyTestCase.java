@@ -55,6 +55,7 @@ import org.mule.runtime.core.internal.construct.FlowBackPressureException;
 import org.mule.runtime.core.internal.exception.MessagingException;
 import org.mule.runtime.core.internal.processor.strategy.ProactorStreamEmitterProcessingStrategyFactory.ProactorStreamEmitterProcessingStrategy;
 import org.mule.tck.TriggerableMessageSource;
+import org.mule.tck.junit4.FlakyTest;
 import org.mule.tck.testmodels.mule.TestTransaction;
 
 import org.apache.commons.io.input.NullInputStream;
@@ -218,6 +219,7 @@ public class ProactorStreamEmitterProcessingStrategyTestCase extends AbstractPro
     processFlow(testEvent());
   }
 
+  @FlakyTest
   @Override
   @Description("When the ReactorProcessingStrategy is configured and a transaction is active processing fails with an error")
   public void asyncCpuLight() throws Exception {
@@ -382,6 +384,7 @@ public class ProactorStreamEmitterProcessingStrategyTestCase extends AbstractPro
 
   @Test
   @Description("Notifications are invoked on CPU_LITE thread")
+  @FlakyTest
   public void asyncProcessorNotificationExecutionThreads() throws Exception {
     AtomicReference<Thread> beforeThread = new AtomicReference<>();
     AtomicReference<Thread> afterThread = new AtomicReference<>();
