@@ -30,6 +30,7 @@ import org.mule.runtime.core.api.event.CoreEvent;
 import org.mule.runtime.core.api.processor.ReactiveProcessor;
 import org.mule.runtime.core.privileged.event.BaseEventContext;
 
+import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 
 import java.util.concurrent.RejectedExecutionException;
@@ -115,7 +116,7 @@ public abstract class ProactorStreamProcessingStrategy
             .transform(processor)
             .subscriberContext(ctx -> ctx.put(PROCESSOR_SCHEDULER_CONTEXT_KEY, getCpuLightScheduler()));
       } else {
-        return withRetry(scheduleProcessor(processor, scheduler, event)
+        return withRetry(scheduleProcessor(processor, scheduler, just(event))
             .subscriberContext(ctx -> ctx.put(PROCESSOR_SCHEDULER_CONTEXT_KEY, scheduler)), scheduler);
       }
     }, max(maxConcurrency / (getParallelism() * subscribers), 1));
@@ -127,7 +128,7 @@ public abstract class ProactorStreamProcessingStrategy
   }
 
   protected abstract Flux<CoreEvent> scheduleProcessor(ReactiveProcessor processor, Scheduler processorScheduler,
-                                                       CoreEvent event);
+                                                       Publisher<CoreEvent> eventPub);
 
   private Flux<CoreEvent> withRetry(Flux<CoreEvent> scheduledFlux, Scheduler processorScheduler) {
     return scheduledFlux.retryWhen(onlyIf(ctx -> {
@@ -208,6 +209,11 @@ public abstract class ProactorStreamProcessingStrategy
     @Override
     public final void dispose() {
       innerSink.dispose();
+    }
+
+    @Override
+    public boolean isCancelled() {
+      return innerSink.isCancelled();
     }
   }
 }

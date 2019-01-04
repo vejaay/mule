@@ -87,6 +87,7 @@ public abstract class AbstractProcessingStrategy implements ProcessingStrategy {
 
     E intoSink(CoreEvent event);
 
+    boolean isCancelled();
   }
 
   /**
@@ -96,7 +97,7 @@ public abstract class AbstractProcessingStrategy implements ProcessingStrategy {
 
     private final FluxSink<E> fluxSink;
     private final reactor.core.Disposable disposable;
-    private final Consumer onEventConsumer;
+    private final Consumer<CoreEvent> onEventConsumer;
     private final int bufferSize;
 
     DefaultReactorSink(FluxSink<E> fluxSink, reactor.core.Disposable disposable,
@@ -150,5 +151,9 @@ public abstract class AbstractProcessingStrategy implements ProcessingStrategy {
       disposable.dispose();
     }
 
+    @Override
+    public final boolean isCancelled() {
+      return fluxSink.isCancelled();
+    }
   }
 }

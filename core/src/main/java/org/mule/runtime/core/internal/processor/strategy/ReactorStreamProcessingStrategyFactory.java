@@ -8,6 +8,7 @@ package org.mule.runtime.core.internal.processor.strategy;
 
 import static java.lang.Math.max;
 import static java.lang.Math.min;
+import static java.util.Objects.requireNonNull;
 import static org.mule.runtime.core.api.processor.ReactiveProcessor.ProcessingType.CPU_LITE;
 import static org.mule.runtime.core.api.processor.ReactiveProcessor.ProcessingType.CPU_LITE_ASYNC;
 import static reactor.core.publisher.Flux.from;
@@ -85,7 +86,7 @@ public class ReactorStreamProcessingStrategyFactory extends AbstractStreamProces
       reactor.core.scheduler.Scheduler scheduler = fromExecutorService(decorateScheduler(getCpuLightScheduler()));
       if (maxConcurrency > subscribers) {
         return publisher -> from(publisher)
-            .parallel(parallelism)
+            .parallel(getParallelism())
             .runOn(scheduler)
             .composeGroup(super.onPipeline(pipeline));
       } else {

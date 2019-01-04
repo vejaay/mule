@@ -66,6 +66,11 @@ public class TransactionAwareProactorStreamEmitterProcessingStrategyFactory exte
     return TransactionAwareProactorStreamEmitterProcessingStrategy.class;
   }
 
+  @Override
+  protected int getSubscriberCount() {
+    return CORES;
+  }
+
   static class TransactionAwareProactorStreamEmitterProcessingStrategy extends ProactorStreamEmitterProcessingStrategy {
 
     TransactionAwareProactorStreamEmitterProcessingStrategy(Supplier<Scheduler> ringBufferSchedulerSupplier,

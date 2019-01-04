@@ -114,7 +114,6 @@ public class ProcessingStrategyBenchmark extends AbstractBenchmark {
         .transform(transformFunction)
         .doOnNext(event -> ((MonoSink<CoreEvent>) (event.getMessage().getPayload().getValue())).success(event))
         .onErrorContinue((t, event) -> {
-          t.printStackTrace();
           ((MonoSink<CoreEvent>) (((CoreEvent) event).getMessage().getPayload().getValue())).error(t);
         });
   }
@@ -144,7 +143,7 @@ public class ProcessingStrategyBenchmark extends AbstractBenchmark {
   }
 
   @Benchmark
-  @Threads(Threads.MAX)
+  @Threads(1)
   public CoreEvent directPipeline() {
     return Mono.<CoreEvent>create(resultSink -> {
       directPipeline.next(createEvent(flow, resultSink));
@@ -152,7 +151,7 @@ public class ProcessingStrategyBenchmark extends AbstractBenchmark {
   }
 
   @Benchmark
-  @Threads(Threads.MAX)
+  @Threads(1)
   public CoreEvent emitterPipeline() {
     return Mono.<CoreEvent>create(resultSink -> {
       emitterPipeline.next(createEvent(flow, resultSink));
@@ -160,7 +159,7 @@ public class ProcessingStrategyBenchmark extends AbstractBenchmark {
   }
 
   @Benchmark
-  @Threads(Threads.MAX)
+  @Threads(1)
   public CoreEvent workQueuePipeline() {
     return Mono.<CoreEvent>create(resultSink -> {
       workQueuePipeline.next(createEvent(flow, resultSink));
@@ -168,7 +167,7 @@ public class ProcessingStrategyBenchmark extends AbstractBenchmark {
   }
 
   @Benchmark
-  @Threads(Threads.MAX)
+  @Threads(1)
   public CoreEvent directProcessor() {
     return Mono.<CoreEvent>create(resultSink -> {
       directProcessor.next(createEvent(flow, resultSink));
@@ -176,7 +175,7 @@ public class ProcessingStrategyBenchmark extends AbstractBenchmark {
   }
 
   @Benchmark
-  @Threads(Threads.MAX)
+  @Threads(1)
   public CoreEvent emitterProcessor() {
     return Mono.<CoreEvent>create(resultSink -> {
       emitterProcessor.next(createEvent(flow, resultSink));
@@ -184,7 +183,7 @@ public class ProcessingStrategyBenchmark extends AbstractBenchmark {
   }
 
   @Benchmark
-  @Threads(Threads.MAX)
+  @Threads(1)
   public CoreEvent workQueueProcessor() {
     return Mono.<CoreEvent>create(resultSink -> {
       workQueueProcessor.next(createEvent(flow, resultSink));
@@ -213,16 +212,5 @@ public class ProcessingStrategyBenchmark extends AbstractBenchmark {
     return Mono.<CoreEvent>create(resultSink -> {
       workQueueAllSink.accept(createEvent(flow, resultSink));
     }).block();
-  }
-
-  public static void main(String[] args) {
-    final ProcessingStrategyBenchmark b = new ProcessingStrategyBenchmark();
-
-    try {
-      b.setUp();
-    } catch (MuleException e) {
-      e.printStackTrace();
-    }
-    b.workQueuePipeline();
   }
 }
