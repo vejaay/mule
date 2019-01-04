@@ -6,19 +6,23 @@
  */
 package org.mule.runtime.core.internal.processor.strategy;
 
-import static java.lang.Long.max;
+import static java.lang.Integer.MAX_VALUE;
+import static java.lang.Math.max;
+import static java.lang.Runtime.getRuntime;
 import static java.lang.System.currentTimeMillis;
 import static java.lang.Thread.currentThread;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static org.mule.runtime.core.api.lifecycle.LifecycleUtils.disposeIfNeeded;
 import static org.mule.runtime.core.api.processor.ReactiveProcessor.ProcessingType.BLOCKING;
 import static org.mule.runtime.core.api.processor.ReactiveProcessor.ProcessingType.CPU_INTENSIVE;
 import static org.mule.runtime.core.internal.context.thread.notification.ThreadNotificationLogger.THREAD_NOTIFICATION_LOGGER_CONTEXT_KEY;
 import static org.slf4j.LoggerFactory.getLogger;
-import static reactor.core.publisher.Flux.just;
+import static reactor.core.publisher.Flux.from;
 import static reactor.core.publisher.Mono.subscriberContext;
 import static reactor.core.scheduler.Schedulers.fromExecutorService;
 
 import org.mule.runtime.api.exception.MuleRuntimeException;
+import org.mule.runtime.api.lifecycle.Disposable;
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.runtime.api.scheduler.SchedulerService;
 import org.mule.runtime.api.util.concurrent.Latch;
@@ -30,23 +34,25 @@ import org.mule.runtime.core.api.processor.ReactiveProcessor.ProcessingType;
 import org.mule.runtime.core.api.processor.Sink;
 import org.mule.runtime.core.api.processor.strategy.ProcessingStrategy;
 import org.mule.runtime.core.internal.context.thread.notification.ThreadLoggingExecutorServiceDecorator;
+import org.mule.runtime.core.internal.processor.strategy.AbstractProcessingStrategy.ReactorSink;
 
+import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.IntUnaryOperator;
 import java.util.function.Supplier;
 
+import cn.danielw.fop.ObjectFactory;
+import cn.danielw.fop.ObjectPool;
+import cn.danielw.fop.PoolConfig;
+import cn.danielw.fop.Poolable;
 import reactor.core.publisher.EmitterProcessor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /**
  * Creates {@link ReactorProcessingStrategyFactory.ReactorProcessingStrategy} instance that implements the proactor pattern by
- * de-multiplexing incoming events onto a multiple emitter using the {@link SchedulerService#cpuLightScheduler()} to process
- * these events from each emitter. In contrast to the {@link ReactorStreamProcessingStrategy} the proactor pattern treats
+ * de-multiplexing incoming events onto a multiple emitter using the {@link SchedulerService#cpuLightScheduler()} to process these
+ * events from each emitter. In contrast to the {@link ReactorStreamProcessingStrategy} the proactor pattern treats
  * {@link ProcessingType#CPU_INTENSIVE} and {@link ProcessingType#BLOCKING} processors differently and schedules there execution
  * on dedicated {@link SchedulerService#cpuIntensiveScheduler()} and {@link SchedulerService#ioScheduler()} ()} schedulers.
  * <p/>
@@ -127,54 +133,73 @@ public class ProactorStreamEmitterProcessingStrategyFactory extends ReactorStrea
 
     @Override
     public Sink createSink(FlowConstruct flowConstruct, ReactiveProcessor function) {
+      int concurrency = maxConcurrency < getRuntime().availableProcessors() ? maxConcurrency : getRuntime().availableProcessors();
+
+      PoolConfig config = new PoolConfig()
+          .setPartitionSize(concurrency)
+          .setMaxSize(1)
+          .setMinSize(1)
+          .setMaxIdleMilliseconds(MAX_VALUE)
+          .setScavengeIntervalMilliseconds(0);
+
       final long shutdownTimeout = flowConstruct.getMuleContext().getConfiguration().getShutdownTimeout();
-      List<ReactorSink<CoreEvent>> sinks = new ArrayList<>();
-      int concurrency = maxConcurrency < subscribers ? maxConcurrency : subscribers;
-      reactor.core.scheduler.Scheduler scheduler = fromExecutorService(decorateScheduler(getCpuLightScheduler()));
-      for (int i = 0; i < concurrency; i++) {
-        Latch completionLatch = new Latch();
-        EmitterProcessor<CoreEvent> processor = EmitterProcessor.create(bufferSize / concurrency);
-        processor.publishOn(scheduler).doOnSubscribe(subscription -> currentThread().setContextClassLoader(executionClassloader))
-            .transform(function).subscribe(null, e -> completionLatch.release(), () -> completionLatch.release());
+      ObjectPool<ReactorSink<CoreEvent>> policySinkPool = new ObjectPool<>(config, new ObjectFactory<ReactorSink<CoreEvent>>() {
 
-        ReactorSink<CoreEvent> sink = new DefaultReactorSink<>(processor.sink(), () -> {
-          long start = currentTimeMillis();
-          try {
-            if (!completionLatch.await(max(start - currentTimeMillis() + shutdownTimeout, 0l), MILLISECONDS)) {
-              LOGGER.warn("Subscribers of ProcessingStrategy for flow '{}' not completed in {} ms", flowConstruct.getName(),
-                          shutdownTimeout);
+        @Override
+        public ReactorSink<CoreEvent> create() {
+          Latch completionLatch = new Latch();
+          EmitterProcessor<CoreEvent> processor = EmitterProcessor.create(bufferSize / concurrency);
+          processor
+              .transform(function)
+              .subscribe(null, e -> completionLatch.release(), () -> completionLatch.release());
+
+          return new ProactorSinkWrapper<>(new DefaultReactorSink<>(processor.sink(), () -> {
+            long start = currentTimeMillis();
+            try {
+              if (!completionLatch.await(max(start - currentTimeMillis() + shutdownTimeout, 0l), MILLISECONDS)) {
+                LOGGER.warn("Subscribers of ProcessingStrategy for flow '{}' not completed in {} ms", flowConstruct.getName(),
+                            shutdownTimeout);
+              }
+            } catch (InterruptedException e) {
+              currentThread().interrupt();
+              throw new MuleRuntimeException(e);
             }
-          } catch (InterruptedException e) {
-            currentThread().interrupt();
-            throw new MuleRuntimeException(e);
-          }
-        }, createOnEventConsumer(), bufferSize);
-        sinks.add(new ProactorSinkWrapper<>(sink));
-      }
+          }, createOnEventConsumer(), bufferSize));
+        }
 
-      return new RoundRobinReactorSink<>(sinks);
+        @Override
+        public void destroy(ReactorSink<CoreEvent> t) {
+          disposeIfNeeded(t, LOGGER);
+        }
+
+        @Override
+        public boolean validate(ReactorSink<CoreEvent> t) {
+          return !t.isCancelled();
+        }
+      });
+
+      return new PooledReactorSink(policySinkPool);
     }
 
     @Override
     public ReactiveProcessor onPipeline(ReactiveProcessor pipeline) {
-      return pipeline;
+      reactor.core.scheduler.Scheduler scheduler = fromExecutorService(decorateScheduler(getCpuLightScheduler()));
+      return publisher -> from(publisher).publishOn(scheduler).transform(pipeline);
     }
 
     @Override
-    protected Flux<CoreEvent> scheduleProcessor(ReactiveProcessor processor, Scheduler processorScheduler, CoreEvent event) {
-      return scheduleWithLogging(processor, processorScheduler, event);
-    }
-
-    private Flux<CoreEvent> scheduleWithLogging(ReactiveProcessor processor, Scheduler processorScheduler, CoreEvent event) {
+    protected Flux<CoreEvent> scheduleProcessor(ReactiveProcessor processor, Scheduler processorScheduler,
+                                                Publisher<CoreEvent> eventPub) {
       if (isThreadLoggingEnabled) {
-        return just(event)
+        return from(eventPub)
             .flatMap(e -> subscriberContext()
                 .flatMap(ctx -> Mono.just(e).transform(processor)
                     .subscribeOn(fromExecutorService(new ThreadLoggingExecutorServiceDecorator(ctx
                         .getOrEmpty(THREAD_NOTIFICATION_LOGGER_CONTEXT_KEY), decorateScheduler(processorScheduler),
                                                                                                e.getContext().getId())))));
       } else {
-        return just(event)
+        return from(eventPub)
+            .publishOn(fromExecutorService(decorateScheduler(processorScheduler)))
             .transform(processor)
             .subscribeOn(fromExecutorService(decorateScheduler(processorScheduler)));
       }
@@ -182,40 +207,35 @@ public class ProactorStreamEmitterProcessingStrategyFactory extends ReactorStrea
 
   }
 
-  static class RoundRobinReactorSink<E> implements AbstractProcessingStrategy.ReactorSink<E> {
+  static class PooledReactorSink implements Sink, Disposable {
 
-    private final List<AbstractProcessingStrategy.ReactorSink<E>> fluxSinks;
-    private final AtomicInteger index = new AtomicInteger(0);
-    // Saving update function to avoid creating the lambda every time
-    private final IntUnaryOperator update;
+    private final ObjectPool<ReactorSink<CoreEvent>> policySinkPool;
 
-    public RoundRobinReactorSink(List<AbstractProcessingStrategy.ReactorSink<E>> sinks) {
-      this.fluxSinks = sinks;
-      this.update = (value) -> (value + 1) % fluxSinks.size();
-    }
-
-    @Override
-    public void dispose() {
-      fluxSinks.stream().forEach(sink -> sink.dispose());
+    public PooledReactorSink(ObjectPool<ReactorSink<CoreEvent>> policySinkPool) {
+      this.policySinkPool = policySinkPool;
     }
 
     @Override
     public void accept(CoreEvent event) {
-      fluxSinks.get(nextIndex()).accept(event);
-    }
-
-    private int nextIndex() {
-      return index.getAndUpdate(update);
+      try (Poolable<ReactorSink<CoreEvent>> borrowedSink = policySinkPool.borrowObject()) {
+        borrowedSink.getObject().accept(event);
+      }
     }
 
     @Override
     public boolean emit(CoreEvent event) {
-      return fluxSinks.get(nextIndex()).emit(event);
+      try (Poolable<ReactorSink<CoreEvent>> borrowedSink = policySinkPool.borrowObject()) {
+        return borrowedSink.getObject().emit(event);
+      }
     }
 
     @Override
-    public E intoSink(CoreEvent event) {
-      return (E) event;
+    public void dispose() {
+      try {
+        policySinkPool.shutdown();
+      } catch (InterruptedException e) {
+        currentThread().interrupt();
+      }
     }
   }
 

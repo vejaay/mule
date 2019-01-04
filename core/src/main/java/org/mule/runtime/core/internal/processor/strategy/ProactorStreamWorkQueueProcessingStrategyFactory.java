@@ -11,7 +11,7 @@ import static java.lang.Math.min;
 import static org.mule.runtime.core.api.processor.ReactiveProcessor.ProcessingType.BLOCKING;
 import static org.mule.runtime.core.api.processor.ReactiveProcessor.ProcessingType.CPU_INTENSIVE;
 import static org.mule.runtime.core.internal.context.thread.notification.ThreadNotificationLogger.THREAD_NOTIFICATION_LOGGER_CONTEXT_KEY;
-import static reactor.core.publisher.Flux.just;
+import static reactor.core.publisher.Flux.from;
 import static reactor.core.publisher.Mono.subscriberContext;
 import static reactor.core.scheduler.Schedulers.fromExecutorService;
 
@@ -23,6 +23,8 @@ import org.mule.runtime.core.api.processor.ReactiveProcessor;
 import org.mule.runtime.core.api.processor.ReactiveProcessor.ProcessingType;
 import org.mule.runtime.core.api.processor.strategy.ProcessingStrategy;
 import org.mule.runtime.core.internal.context.thread.notification.ThreadLoggingExecutorServiceDecorator;
+
+import org.reactivestreams.Publisher;
 
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -131,23 +133,24 @@ public class ProactorStreamWorkQueueProcessingStrategyFactory extends ReactorStr
     }
 
     @Override
-    protected Flux<CoreEvent> scheduleProcessor(ReactiveProcessor processor, Scheduler processorScheduler, CoreEvent event) {
+    protected Flux<CoreEvent> scheduleProcessor(ReactiveProcessor processor, Scheduler processorScheduler,
+                                                Publisher<CoreEvent> eventPub) {
       reactor.core.scheduler.Scheduler eventLoopScheduler = fromExecutorService(decorateScheduler(getCpuLightScheduler()));
-      return scheduleWithLogging(processor, eventLoopScheduler, processorScheduler, event);
+      return scheduleWithLogging(processor, eventLoopScheduler, processorScheduler, eventPub);
     }
 
     private Flux<CoreEvent> scheduleWithLogging(ReactiveProcessor processor, reactor.core.scheduler.Scheduler eventLoopScheduler,
-                                                Scheduler processorScheduler, CoreEvent event) {
+                                                Scheduler processorScheduler, Publisher<CoreEvent> eventPub) {
       if (isThreadLoggingEnabled) {
         final Context ctx = subscriberContext().block();
-        return just(event)
+        return from(eventPub)
             .flatMap(e -> Mono.just(e).transform(processor)
                 .publishOn(eventLoopScheduler)
                 .subscribeOn(fromExecutorService(new ThreadLoggingExecutorServiceDecorator(ctx
                     .getOrEmpty(THREAD_NOTIFICATION_LOGGER_CONTEXT_KEY), decorateScheduler(processorScheduler),
                                                                                            e.getContext().getId()))));
       } else {
-        return just(event)
+        return from(eventPub)
             .transform(processor)
             .publishOn(eventLoopScheduler)
             .subscribeOn(fromExecutorService(decorateScheduler(processorScheduler)));
