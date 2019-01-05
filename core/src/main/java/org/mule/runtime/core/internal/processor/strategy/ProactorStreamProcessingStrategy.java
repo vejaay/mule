@@ -59,8 +59,7 @@ public abstract class ProactorStreamProcessingStrategy extends AbstractReactorSt
 
   private final AtomicLong lastRetryTimestamp = new AtomicLong(MIN_VALUE);
 
-  public ProactorStreamProcessingStrategy(int bufferSize,
-                                          int subscriberCount,
+  public ProactorStreamProcessingStrategy(int subscriberCount,
                                           Supplier<Scheduler> cpuLightSchedulerSupplier,
                                           Supplier<Scheduler> blockingSchedulerSupplier,
                                           Supplier<Scheduler> cpuIntensiveSchedulerSupplier,
@@ -69,7 +68,7 @@ public abstract class ProactorStreamProcessingStrategy extends AbstractReactorSt
                                           boolean maxConcurrencyEagerCheck)
 
   {
-    super(bufferSize, subscriberCount, cpuLightSchedulerSupplier, parallelism, maxConcurrency, maxConcurrencyEagerCheck);
+    super(subscriberCount, cpuLightSchedulerSupplier, parallelism, maxConcurrency, maxConcurrencyEagerCheck);
     this.blockingSchedulerSupplier = blockingSchedulerSupplier;
     this.cpuIntensiveSchedulerSupplier = cpuIntensiveSchedulerSupplier;
   }

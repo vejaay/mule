@@ -10,6 +10,7 @@ import static java.lang.Integer.MAX_VALUE;
 import static java.lang.Long.max;
 import static java.lang.System.currentTimeMillis;
 import static java.lang.Thread.currentThread;
+import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.mule.runtime.core.api.lifecycle.LifecycleUtils.disposeIfNeeded;
 import static org.mule.runtime.core.api.processor.ReactiveProcessor.ProcessingType.BLOCKING;
@@ -97,6 +98,7 @@ public class ProactorStreamEmitterProcessingStrategyFactory extends ReactorStrea
 
     private static Logger LOGGER = getLogger(ProactorStreamEmitterProcessingStrategy.class);
 
+    private final int bufferSize;
     private final boolean isThreadLoggingEnabled;
 
     public ProactorStreamEmitterProcessingStrategy(int bufferSize,
@@ -109,9 +111,10 @@ public class ProactorStreamEmitterProcessingStrategyFactory extends ReactorStrea
                                                    boolean isThreadLoggingEnabled)
 
     {
-      super(bufferSize, subscriberCount, cpuLightSchedulerSupplier,
+      super(subscriberCount, cpuLightSchedulerSupplier,
             blockingSchedulerSupplier, cpuIntensiveSchedulerSupplier, parallelism, maxConcurrency,
             maxConcurrencyEagerCheck);
+      this.bufferSize = requireNonNull(bufferSize);
       this.isThreadLoggingEnabled = isThreadLoggingEnabled;
     }
 

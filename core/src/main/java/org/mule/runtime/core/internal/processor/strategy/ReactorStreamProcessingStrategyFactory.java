@@ -35,7 +35,7 @@ import java.util.function.Supplier;
  *
  * @since 4.0
  */
-public class ReactorStreamProcessingStrategyFactory extends AbstractStreamProcessingStrategyFactory {
+public class ReactorStreamProcessingStrategyFactory extends AbstractStreamWorkQueueProcessingStrategyFactory {
 
   @Override
   public ProcessingStrategy create(MuleContext muleContext, String schedulersNamePrefix) {
@@ -74,7 +74,7 @@ public class ReactorStreamProcessingStrategyFactory extends AbstractStreamProces
     ReactorStreamProcessingStrategy(Supplier<Scheduler> ringBufferSchedulerSupplier, int bufferSize, int subscribers,
                                     String waitStrategy, Supplier<Scheduler> cpuLightSchedulerSupplier, int parallelism,
                                     int maxConcurrency, boolean maxConcurrencyEagerCheck) {
-      super(bufferSize, subscribers, cpuLightSchedulerSupplier, parallelism,
+      super(subscribers, cpuLightSchedulerSupplier, parallelism,
             maxConcurrency, maxConcurrencyEagerCheck);
       this.workQueueStreamProcessingStrategy = new WorkQueueStreamProcessingStrategy(ringBufferSchedulerSupplier,
                                                                                      bufferSize,

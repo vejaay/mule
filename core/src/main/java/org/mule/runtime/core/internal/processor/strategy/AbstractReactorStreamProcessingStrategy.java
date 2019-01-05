@@ -25,10 +25,10 @@ abstract class AbstractReactorStreamProcessingStrategy extends AbstractStreamPro
   private Scheduler cpuLightScheduler;
   private final int parallelism;
 
-  AbstractReactorStreamProcessingStrategy(int bufferSize, int subscribers,
+  AbstractReactorStreamProcessingStrategy(int subscribers,
                                           Supplier<Scheduler> cpuLightSchedulerSupplier, int parallelism,
                                           int maxConcurrency, boolean maxConcurrencyEagerCheck) {
-    super(bufferSize, subscribers, maxConcurrency, maxConcurrencyEagerCheck);
+    super(subscribers, maxConcurrency, maxConcurrencyEagerCheck);
     this.cpuLightSchedulerSupplier = cpuLightSchedulerSupplier;
     this.parallelism = parallelism;
   }

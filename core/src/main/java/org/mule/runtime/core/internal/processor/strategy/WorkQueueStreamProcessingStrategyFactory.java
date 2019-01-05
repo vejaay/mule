@@ -15,11 +15,18 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.mule.runtime.core.api.processor.ReactiveProcessor.ProcessingType.BLOCKING;
 import static org.mule.runtime.core.api.processor.ReactiveProcessor.ProcessingType.CPU_LITE_ASYNC;
 import static org.mule.runtime.core.internal.context.thread.notification.ThreadNotificationLogger.THREAD_NOTIFICATION_LOGGER_CONTEXT_KEY;
-import static org.mule.runtime.core.internal.processor.strategy.AbstractStreamProcessingStrategyFactory.AbstractStreamProcessingStrategy.WaitStrategy.valueOf;
+import static org.mule.runtime.core.internal.processor.strategy.WorkQueueStreamProcessingStrategyFactory.WaitStrategy.valueOf;
 import static reactor.core.publisher.Flux.from;
 import static reactor.core.publisher.Flux.just;
 import static reactor.core.publisher.Mono.subscriberContext;
 import static reactor.core.scheduler.Schedulers.fromExecutorService;
+import static reactor.util.concurrent.WaitStrategy.blocking;
+import static reactor.util.concurrent.WaitStrategy.busySpin;
+import static reactor.util.concurrent.WaitStrategy.liteBlocking;
+import static reactor.util.concurrent.WaitStrategy.parking;
+import static reactor.util.concurrent.WaitStrategy.phasedOffLiteLock;
+import static reactor.util.concurrent.WaitStrategy.sleeping;
+import static reactor.util.concurrent.WaitStrategy.yielding;
 
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.exception.MuleRuntimeException;
@@ -61,7 +68,7 @@ import reactor.util.context.Context;
  *
  * @since 4.0
  */
-public class WorkQueueStreamProcessingStrategyFactory extends AbstractStreamProcessingStrategyFactory {
+public class WorkQueueStreamProcessingStrategyFactory extends AbstractStreamWorkQueueProcessingStrategyFactory {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(WorkQueueStreamProcessingStrategyFactory.class);
 
@@ -85,6 +92,7 @@ public class WorkQueueStreamProcessingStrategyFactory extends AbstractStreamProc
 
   static class WorkQueueStreamProcessingStrategy extends AbstractStreamProcessingStrategy implements Startable, Stoppable {
 
+    private final int bufferSize;
     private final Supplier<Scheduler> ringBufferSchedulerSupplier;
     private final Supplier<Scheduler> blockingSchedulerSupplier;
     private final WaitStrategy waitStrategy;
@@ -97,7 +105,8 @@ public class WorkQueueStreamProcessingStrategyFactory extends AbstractStreamProc
                                                 String waitStrategy, Supplier<Scheduler> blockingSchedulerSupplier,
                                                 int maxConcurrency, boolean maxConcurrencyEagerCheck,
                                                 boolean isThreadLoggingEnabled) {
-      super(bufferSize, subscribers, maxConcurrency, maxConcurrencyEagerCheck);
+      super(subscribers, maxConcurrency, maxConcurrencyEagerCheck);
+      this.bufferSize = requireNonNull(bufferSize);
       this.ringBufferSchedulerSupplier = requireNonNull(ringBufferSchedulerSupplier);
       this.blockingSchedulerSupplier = requireNonNull(blockingSchedulerSupplier);
       this.waitStrategy = valueOf(waitStrategy);
@@ -219,6 +228,32 @@ public class WorkQueueStreamProcessingStrategyFactory extends AbstractStreamProc
       }
     }
 
+  }
+
+  protected enum WaitStrategy {
+    BLOCKING(blocking()),
+
+    LITE_BLOCKING(liteBlocking()),
+
+    SLEEPING(sleeping()),
+
+    BUSY_SPIN(busySpin()),
+
+    YIELDING(yielding()),
+
+    PARKING(parking()),
+
+    PHASED(phasedOffLiteLock(200, 100, MILLISECONDS));
+
+    private final reactor.util.concurrent.WaitStrategy reactorWaitStrategy;
+
+    WaitStrategy(reactor.util.concurrent.WaitStrategy reactorWaitStrategy) {
+      this.reactorWaitStrategy = reactorWaitStrategy;
+    }
+
+    reactor.util.concurrent.WaitStrategy getReactorWaitStrategy() {
+      return reactorWaitStrategy;
+    }
   }
 
 }

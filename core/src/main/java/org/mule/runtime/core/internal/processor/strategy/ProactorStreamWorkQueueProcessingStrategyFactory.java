@@ -115,7 +115,7 @@ public class ProactorStreamWorkQueueProcessingStrategyFactory extends ReactorStr
                                                      boolean isThreadLoggingEnabled)
 
     {
-      super(bufferSize, subscriberCount, cpuLightSchedulerSupplier,
+      super(subscriberCount, cpuLightSchedulerSupplier,
             blockingSchedulerSupplier, cpuIntensiveSchedulerSupplier, parallelism, maxConcurrency,
             maxConcurrencyEagerCheck);
       this.workQueueStreamProcessingStrategy = new WorkQueueStreamProcessingStrategy(ringBufferSchedulerSupplier,

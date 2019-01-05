@@ -9,34 +9,19 @@ package org.mule.runtime.core.internal.processor.strategy;
 import static java.lang.Integer.MAX_VALUE;
 import static java.lang.Integer.getInteger;
 import static java.lang.Runtime.getRuntime;
-import static java.lang.System.getProperty;
 import static java.lang.Thread.currentThread;
 import static java.util.Objects.requireNonNull;
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
-import static org.mule.runtime.core.internal.processor.strategy.AbstractStreamProcessingStrategyFactory.AbstractStreamProcessingStrategy.WaitStrategy.LITE_BLOCKING;
 import static reactor.util.concurrent.Queues.SMALL_BUFFER_SIZE;
 import static reactor.util.concurrent.Queues.isPowerOfTwo;
-import static reactor.util.concurrent.WaitStrategy.blocking;
-import static reactor.util.concurrent.WaitStrategy.busySpin;
-import static reactor.util.concurrent.WaitStrategy.liteBlocking;
-import static reactor.util.concurrent.WaitStrategy.parking;
-import static reactor.util.concurrent.WaitStrategy.phasedOffLiteLock;
-import static reactor.util.concurrent.WaitStrategy.sleeping;
-import static reactor.util.concurrent.WaitStrategy.yielding;
 
-import org.mule.runtime.api.scheduler.Scheduler;
-import org.mule.runtime.core.api.MuleContext;
 import org.mule.runtime.core.api.processor.strategy.ProcessingStrategy;
 import org.mule.runtime.core.api.processor.strategy.ProcessingStrategyFactory;
 
-import java.util.function.Supplier;
-
 /**
- * Abstract {@link ProcessingStrategyFactory} to be used by implementations that de-multiplex incoming messages using a
- * ring-buffer which can then be subscribed to n times.
+ * Abstract {@link ProcessingStrategyFactory} to be used by implementations that de-multiplex incoming messages.
  * <p>
  * Processing strategies created with this factory are not suitable for transactional flows and will fail if used with an active
- * transaction.
+ * transaction by default.
  *
  * @since 4.0
  */
@@ -51,12 +36,8 @@ abstract class AbstractStreamProcessingStrategyFactory extends AbstractProcessin
   // required to achieve absolute minimum latency for the scenarios where this is important.
   protected static final int DEFAULT_SUBSCRIBER_COUNT =
       getInteger(SYSTEM_PROPERTY_PREFIX + "DEFAULT_SUBSCRIBER_COUNT", Integer.max(1, (CORES / 2)));
-  protected static final String DEFAULT_WAIT_STRATEGY =
-      getProperty(SYSTEM_PROPERTY_PREFIX + "DEFAULT_WAIT_STRATEGY", LITE_BLOCKING.name());
-  protected static String RING_BUFFER_SCHEDULER_NAME_SUFFIX = ".ring-buffer";
   private int bufferSize = DEFAULT_BUFFER_SIZE;
   private int subscriberCount = DEFAULT_SUBSCRIBER_COUNT;
-  private String waitStrategy = DEFAULT_WAIT_STRATEGY;
 
   /**
    * Configure the size of the ring-buffer size used to buffer and de-multiplexes events from multiple source threads. This value
@@ -83,15 +64,6 @@ abstract class AbstractStreamProcessingStrategyFactory extends AbstractProcessin
     this.subscriberCount = subscriberCount;
   }
 
-  /**
-   * Configure the wait strategy used to wait for new events on ring-buffer.
-   *
-   * @param waitStrategy
-   */
-  public void setWaitStrategy(String waitStrategy) {
-    this.waitStrategy = waitStrategy;
-  }
-
   protected int getBufferSize() {
     return bufferSize;
   }
@@ -100,20 +72,9 @@ abstract class AbstractStreamProcessingStrategyFactory extends AbstractProcessin
     return subscriberCount;
   }
 
-  protected String getWaitStrategy() {
-    return waitStrategy;
-  }
-
   @Override
   public Class<? extends ProcessingStrategy> getProcessingStrategyType() {
     return AbstractStreamProcessingStrategy.class;
-  }
-
-  protected Supplier<Scheduler> getRingBufferSchedulerSupplier(MuleContext muleContext, String schedulersNamePrefix) {
-    return () -> muleContext.getSchedulerService()
-        .customScheduler(muleContext.getSchedulerBaseConfig()
-            .withName(schedulersNamePrefix + RING_BUFFER_SCHEDULER_NAME_SUFFIX)
-            .withMaxConcurrentTasks(getSubscriberCount()).withWaitAllowed(true));
   }
 
   /**
@@ -126,45 +87,17 @@ abstract class AbstractStreamProcessingStrategyFactory extends AbstractProcessin
    */
   abstract static class AbstractStreamProcessingStrategy extends AbstractProcessingStrategy {
 
-    final protected int bufferSize;
     final protected int subscribers;
     final protected int maxConcurrency;
     final protected boolean maxConcurrencyEagerCheck;
     final protected ClassLoader executionClassloader;
 
-    protected AbstractStreamProcessingStrategy(int bufferSize, int subscribers,
+    protected AbstractStreamProcessingStrategy(int subscribers,
                                                int maxConcurrency, boolean maxConcurrencyEagerCheck) {
       this.subscribers = requireNonNull(subscribers);
-      this.bufferSize = requireNonNull(bufferSize);
       this.maxConcurrency = requireNonNull(maxConcurrency);
       this.maxConcurrencyEagerCheck = maxConcurrency < MAX_VALUE && maxConcurrencyEagerCheck;
       this.executionClassloader = currentThread().getContextClassLoader();
-    }
-
-    protected enum WaitStrategy {
-      BLOCKING(blocking()),
-
-      LITE_BLOCKING(liteBlocking()),
-
-      SLEEPING(sleeping()),
-
-      BUSY_SPIN(busySpin()),
-
-      YIELDING(yielding()),
-
-      PARKING(parking()),
-
-      PHASED(phasedOffLiteLock(200, 100, MILLISECONDS));
-
-      private reactor.util.concurrent.WaitStrategy reactorWaitStrategy;
-
-      WaitStrategy(reactor.util.concurrent.WaitStrategy reactorWaitStrategy) {
-        this.reactorWaitStrategy = reactorWaitStrategy;
-      }
-
-      reactor.util.concurrent.WaitStrategy getReactorWaitStrategy() {
-        return reactorWaitStrategy;
-      }
     }
 
   }
