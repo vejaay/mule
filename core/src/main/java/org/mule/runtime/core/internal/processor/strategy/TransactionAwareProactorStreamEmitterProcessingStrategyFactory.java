@@ -6,6 +6,7 @@
  */
 package org.mule.runtime.core.internal.processor.strategy;
 
+import static java.lang.Math.min;
 import static org.mule.runtime.core.api.processor.ReactiveProcessor.ProcessingType.BLOCKING;
 import static org.mule.runtime.core.api.processor.ReactiveProcessor.ProcessingType.CPU_INTENSIVE;
 import static org.mule.runtime.core.api.processor.ReactiveProcessor.ProcessingType.CPU_LITE;
@@ -66,6 +67,11 @@ public class TransactionAwareProactorStreamEmitterProcessingStrategyFactory exte
   @Override
   protected int getSubscriberCount() {
     return CORES;
+  }
+
+  @Override
+  protected int resolveParallelism() {
+    return min(CORES, getMaxConcurrency());
   }
 
   static class TransactionAwareProactorStreamEmitterProcessingStrategy extends ProactorStreamEmitterProcessingStrategy {

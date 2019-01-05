@@ -21,6 +21,7 @@ import static reactor.core.publisher.Flux.from;
 import static reactor.core.publisher.Mono.subscriberContext;
 import static reactor.core.scheduler.Schedulers.fromExecutorService;
 
+import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.exception.MuleRuntimeException;
 import org.mule.runtime.api.lifecycle.Disposable;
 import org.mule.runtime.api.scheduler.Scheduler;
@@ -101,6 +102,8 @@ public class ProactorStreamEmitterProcessingStrategyFactory extends ReactorStrea
     private final int bufferSize;
     private final boolean isThreadLoggingEnabled;
 
+    private reactor.core.scheduler.Scheduler pipelineScheduler;
+
     public ProactorStreamEmitterProcessingStrategy(int bufferSize,
                                                    int subscriberCount,
                                                    Supplier<Scheduler> cpuLightSchedulerSupplier,
@@ -145,18 +148,18 @@ public class ProactorStreamEmitterProcessingStrategyFactory extends ReactorStrea
           .setScavengeIntervalMilliseconds(0);
 
       final long shutdownTimeout = flowConstruct.getMuleContext().getConfiguration().getShutdownTimeout();
-      reactor.core.scheduler.Scheduler scheduler = fromExecutorService(decorateScheduler(getCpuLightScheduler()));
       ObjectPool<ReactorSink<CoreEvent>> policySinkPool = new ObjectPool<>(config, new ObjectFactory<ReactorSink<CoreEvent>>() {
 
         @Override
         public ReactorSink<CoreEvent> create() {
           CountDownLatch completionLatch = new CountDownLatch(1);
           EmitterProcessor<CoreEvent> processor = EmitterProcessor.create(perEmitterBuffersize);
-          processor.publishOn(scheduler)
+          processor
+              .doOnSubscribe(subscription -> currentThread().setContextClassLoader(executionClassloader))
               .transform(function)
               .subscribe(null, e -> completionLatch.countDown(), () -> completionLatch.countDown());
 
-          return new ProactorSinkWrapper<>(new DefaultReactorSink<>(processor.sink(), () -> {
+          return new DefaultReactorSink<>(processor.sink(), () -> {
             long start = currentTimeMillis();
             try {
               if (!completionLatch.await(max(start - currentTimeMillis() + shutdownTimeout, 0l), MILLISECONDS)) {
@@ -167,7 +170,7 @@ public class ProactorStreamEmitterProcessingStrategyFactory extends ReactorStrea
               currentThread().interrupt();
               throw new MuleRuntimeException(e);
             }
-          }, createOnEventConsumer(), perEmitterBuffersize));
+          }, createOnEventConsumer(), perEmitterBuffersize);
         }
 
         @Override
@@ -184,7 +187,12 @@ public class ProactorStreamEmitterProcessingStrategyFactory extends ReactorStrea
         }
       });
 
-      return new PooledReactorSink(policySinkPool);
+      return new ProactorSinkWrapper<>(new PooledReactorSink(policySinkPool));
+    }
+
+    @Override
+    public ReactiveProcessor onPipeline(ReactiveProcessor pipeline) {
+      return p -> Flux.from(p).publishOn(pipelineScheduler).transform(super.onPipeline(pipeline));
     }
 
     @Override
@@ -209,10 +217,16 @@ public class ProactorStreamEmitterProcessingStrategyFactory extends ReactorStrea
       }
     }
 
+    @Override
+    public void start() throws MuleException {
+      super.start();
+      pipelineScheduler = fromExecutorService(decorateScheduler(getCpuLightScheduler()));
+    }
   }
 
-  static final class PooledReactorSink implements Sink, Disposable {
+  static final class PooledReactorSink implements ReactorSink<CoreEvent>, Disposable {
 
+    private volatile boolean disposed = false;
     private final ObjectPool<ReactorSink<CoreEvent>> policySinkPool;
 
     public PooledReactorSink(ObjectPool<ReactorSink<CoreEvent>> policySinkPool) {
@@ -235,11 +249,22 @@ public class ProactorStreamEmitterProcessingStrategyFactory extends ReactorStrea
 
     @Override
     public void dispose() {
+      disposed = true;
       try {
         policySinkPool.shutdown();
       } catch (InterruptedException e) {
         currentThread().interrupt();
       }
+    }
+
+    @Override
+    public CoreEvent intoSink(CoreEvent event) {
+      return event;
+    }
+
+    @Override
+    public boolean isCancelled() {
+      return disposed;
     }
   }
 
