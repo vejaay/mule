@@ -63,10 +63,8 @@ public class ProactorStreamEmitterProcessingStrategyFactory extends ReactorStrea
 
   @Override
   public ProcessingStrategy create(MuleContext muleContext, String schedulersNamePrefix) {
-    return new ProactorStreamEmitterProcessingStrategy(getRingBufferSchedulerSupplier(muleContext, schedulersNamePrefix),
-                                                       getBufferSize(),
+    return new ProactorStreamEmitterProcessingStrategy(getBufferSize(),
                                                        getSubscriberCount(),
-                                                       getWaitStrategy(),
                                                        getCpuLightSchedulerSupplier(muleContext, schedulersNamePrefix),
                                                        () -> muleContext.getSchedulerService()
                                                            .ioScheduler(muleContext.getSchedulerBaseConfig()
@@ -101,10 +99,8 @@ public class ProactorStreamEmitterProcessingStrategyFactory extends ReactorStrea
 
     private final boolean isThreadLoggingEnabled;
 
-    public ProactorStreamEmitterProcessingStrategy(Supplier<Scheduler> ringBufferSchedulerSupplier,
-                                                   int bufferSize,
+    public ProactorStreamEmitterProcessingStrategy(int bufferSize,
                                                    int subscriberCount,
-                                                   String waitStrategy,
                                                    Supplier<Scheduler> cpuLightSchedulerSupplier,
                                                    Supplier<Scheduler> blockingSchedulerSupplier,
                                                    Supplier<Scheduler> cpuIntensiveSchedulerSupplier,
@@ -113,16 +109,14 @@ public class ProactorStreamEmitterProcessingStrategyFactory extends ReactorStrea
                                                    boolean isThreadLoggingEnabled)
 
     {
-      super(ringBufferSchedulerSupplier, bufferSize, subscriberCount, waitStrategy, cpuLightSchedulerSupplier,
+      super(bufferSize, subscriberCount, cpuLightSchedulerSupplier,
             blockingSchedulerSupplier, cpuIntensiveSchedulerSupplier, parallelism, maxConcurrency,
             maxConcurrencyEagerCheck);
       this.isThreadLoggingEnabled = isThreadLoggingEnabled;
     }
 
-    public ProactorStreamEmitterProcessingStrategy(Supplier<Scheduler> ringBufferSchedulerSupplier,
-                                                   int bufferSize,
+    public ProactorStreamEmitterProcessingStrategy(int bufferSize,
                                                    int subscriberCount,
-                                                   String waitStrategy,
                                                    Supplier<Scheduler> cpuLightSchedulerSupplier,
                                                    Supplier<Scheduler> blockingSchedulerSupplier,
                                                    Supplier<Scheduler> cpuIntensiveSchedulerSupplier,
@@ -130,7 +124,7 @@ public class ProactorStreamEmitterProcessingStrategyFactory extends ReactorStrea
                                                    int maxConcurrency, boolean maxConcurrencyEagerCheck)
 
     {
-      this(ringBufferSchedulerSupplier, bufferSize, subscriberCount, waitStrategy, cpuLightSchedulerSupplier,
+      this(bufferSize, subscriberCount, cpuLightSchedulerSupplier,
            blockingSchedulerSupplier, cpuIntensiveSchedulerSupplier, parallelism, maxConcurrency,
            maxConcurrencyEagerCheck, false);
     }

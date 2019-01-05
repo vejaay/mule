@@ -43,8 +43,7 @@ import java.util.function.Supplier;
 import reactor.core.publisher.Flux;
 import reactor.retry.BackoffDelay;
 
-public abstract class ProactorStreamProcessingStrategy
-    extends ReactorStreamProcessingStrategyFactory.ReactorStreamProcessingStrategy {
+public abstract class ProactorStreamProcessingStrategy extends AbstractReactorStreamProcessingStrategy {
 
   protected static final int STREAM_PAYLOAD_BLOCKING_IO_THRESHOLD =
       getInteger(SYSTEM_PROPERTY_PREFIX + "STREAM_PAYLOAD_BLOCKING_IO_THRESHOLD", KB.toBytes(16));
@@ -60,10 +59,8 @@ public abstract class ProactorStreamProcessingStrategy
 
   private final AtomicLong lastRetryTimestamp = new AtomicLong(MIN_VALUE);
 
-  public ProactorStreamProcessingStrategy(Supplier<Scheduler> ringBufferSchedulerSupplier,
-                                          int bufferSize,
+  public ProactorStreamProcessingStrategy(int bufferSize,
                                           int subscriberCount,
-                                          String waitStrategy,
                                           Supplier<Scheduler> cpuLightSchedulerSupplier,
                                           Supplier<Scheduler> blockingSchedulerSupplier,
                                           Supplier<Scheduler> cpuIntensiveSchedulerSupplier,
@@ -72,8 +69,7 @@ public abstract class ProactorStreamProcessingStrategy
                                           boolean maxConcurrencyEagerCheck)
 
   {
-    super(ringBufferSchedulerSupplier, bufferSize, subscriberCount, waitStrategy, cpuLightSchedulerSupplier, parallelism,
-          maxConcurrency, maxConcurrencyEagerCheck);
+    super(bufferSize, subscriberCount, cpuLightSchedulerSupplier, parallelism, maxConcurrency, maxConcurrencyEagerCheck);
     this.blockingSchedulerSupplier = blockingSchedulerSupplier;
     this.cpuIntensiveSchedulerSupplier = cpuIntensiveSchedulerSupplier;
   }

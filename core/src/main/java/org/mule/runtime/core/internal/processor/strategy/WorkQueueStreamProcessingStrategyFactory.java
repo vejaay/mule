@@ -15,6 +15,7 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.mule.runtime.core.api.processor.ReactiveProcessor.ProcessingType.BLOCKING;
 import static org.mule.runtime.core.api.processor.ReactiveProcessor.ProcessingType.CPU_LITE_ASYNC;
 import static org.mule.runtime.core.internal.context.thread.notification.ThreadNotificationLogger.THREAD_NOTIFICATION_LOGGER_CONTEXT_KEY;
+import static org.mule.runtime.core.internal.processor.strategy.AbstractStreamProcessingStrategyFactory.AbstractStreamProcessingStrategy.WaitStrategy.valueOf;
 import static reactor.core.publisher.Flux.from;
 import static reactor.core.publisher.Flux.just;
 import static reactor.core.publisher.Mono.subscriberContext;
@@ -29,10 +30,12 @@ import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.runtime.api.scheduler.SchedulerService;
 import org.mule.runtime.core.api.MuleContext;
 import org.mule.runtime.core.api.construct.FlowConstruct;
+import org.mule.runtime.core.api.event.CoreEvent;
 import org.mule.runtime.core.api.processor.ReactiveProcessor;
 import org.mule.runtime.core.api.processor.Sink;
 import org.mule.runtime.core.api.processor.strategy.ProcessingStrategy;
 import org.mule.runtime.core.internal.context.thread.notification.ThreadLoggingExecutorServiceDecorator;
+import org.mule.runtime.core.privileged.event.BaseEventContext;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,8 +43,10 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
+import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.WorkQueueProcessor;
 import reactor.util.context.Context;
@@ -57,6 +62,8 @@ import reactor.util.context.Context;
  * @since 4.0
  */
 public class WorkQueueStreamProcessingStrategyFactory extends AbstractStreamProcessingStrategyFactory {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(WorkQueueStreamProcessingStrategyFactory.class);
 
   @Override
   public ProcessingStrategy create(MuleContext muleContext, String schedulersNamePrefix) {
@@ -78,7 +85,9 @@ public class WorkQueueStreamProcessingStrategyFactory extends AbstractStreamProc
 
   static class WorkQueueStreamProcessingStrategy extends AbstractStreamProcessingStrategy implements Startable, Stoppable {
 
+    private final Supplier<Scheduler> ringBufferSchedulerSupplier;
     private final Supplier<Scheduler> blockingSchedulerSupplier;
+    private final WaitStrategy waitStrategy;
     private Scheduler blockingScheduler;
     private final List<Sink> sinkList = new ArrayList<>();
     private final boolean isThreadLoggingEnabled;
@@ -88,8 +97,10 @@ public class WorkQueueStreamProcessingStrategyFactory extends AbstractStreamProc
                                                 String waitStrategy, Supplier<Scheduler> blockingSchedulerSupplier,
                                                 int maxConcurrency, boolean maxConcurrencyEagerCheck,
                                                 boolean isThreadLoggingEnabled) {
-      super(ringBufferSchedulerSupplier, bufferSize, subscribers, waitStrategy, maxConcurrency, maxConcurrencyEagerCheck);
+      super(bufferSize, subscribers, maxConcurrency, maxConcurrencyEagerCheck);
+      this.ringBufferSchedulerSupplier = requireNonNull(ringBufferSchedulerSupplier);
       this.blockingSchedulerSupplier = requireNonNull(blockingSchedulerSupplier);
+      this.waitStrategy = valueOf(waitStrategy);
       this.isThreadLoggingEnabled = isThreadLoggingEnabled;
     }
 
@@ -99,6 +110,69 @@ public class WorkQueueStreamProcessingStrategyFactory extends AbstractStreamProc
                                                 int maxConcurrency, boolean maxConcurrencyEagerCheck) {
       this(ringBufferSchedulerSupplier, bufferSize, subscribers, waitStrategy, blockingSchedulerSupplier, maxConcurrency,
            maxConcurrencyEagerCheck, false);
+    }
+
+    @Override
+    public Sink createSink(FlowConstruct flowConstruct, ReactiveProcessor function) {
+      final long shutdownTimeout = flowConstruct.getMuleContext().getConfiguration().getShutdownTimeout();
+      WorkQueueProcessor<EventWrapper> processor =
+          WorkQueueProcessor.<EventWrapper>builder().executor(ringBufferSchedulerSupplier.get()).bufferSize(bufferSize)
+              .waitStrategy(waitStrategy.getReactorWaitStrategy()).build();
+      int subscriberCount = maxConcurrency < subscribers ? maxConcurrency : subscribers;
+      CountDownLatch completionLatch = new CountDownLatch(subscriberCount);
+      for (int i = 0; i < subscriberCount; i++) {
+        processor
+            .doOnSubscribe(subscription -> currentThread().setContextClassLoader(executionClassloader))
+            .map(ew -> ew.getWrappedEvent())
+            .transform(function)
+            .subscribe(null, e -> completionLatch.countDown(), completionLatch::countDown);
+      }
+      return buildSink(processor.sink(), () -> {
+        long start = currentTimeMillis();
+        if (!processor.awaitAndShutdown(ofMillis(shutdownTimeout))) {
+          LOGGER.warn("WorkQueueProcessor of ProcessingStrategy for flow '{}' not shutDown in {} ms. Forcing shutdown...",
+                      flowConstruct.getName(), shutdownTimeout);
+          processor.forceShutdown();
+        }
+        try {
+          if (!completionLatch.await(max(start - currentTimeMillis() + shutdownTimeout, 0l), MILLISECONDS)) {
+            LOGGER.warn("Subscribers of ProcessingStrategy for flow '{}' not completed in {} ms", flowConstruct.getName(),
+                        shutdownTimeout);
+          }
+        } catch (InterruptedException e) {
+          currentThread().interrupt();
+          throw new MuleRuntimeException(e);
+        }
+
+      }, createOnEventConsumer(), bufferSize);
+    }
+
+
+    protected <E> ReactorSink<E> buildSink(FluxSink<E> fluxSink, reactor.core.Disposable disposable,
+                                           Consumer<CoreEvent> onEventConsumer, int bufferSize) {
+      return new DefaultReactorSink(fluxSink, disposable, onEventConsumer, bufferSize) {
+
+        @Override
+        public EventWrapper intoSink(CoreEvent event) {
+          return new EventWrapper(event);
+        }
+      };
+    }
+
+    private static final class EventWrapper {
+
+      CoreEvent wrappedEvent;
+
+      public EventWrapper(CoreEvent event) {
+        this.wrappedEvent = event;
+        ((BaseEventContext) (wrappedEvent.getContext())).getRootContext().onTerminated((e, t) -> {
+          wrappedEvent = null;
+        });
+      }
+
+      public CoreEvent getWrappedEvent() {
+        return wrappedEvent;
+      }
     }
 
     @Override
