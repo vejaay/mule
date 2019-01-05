@@ -22,7 +22,9 @@ import org.mule.runtime.core.internal.processor.strategy.TransactionAwareProacto
 import org.mule.runtime.core.internal.processor.strategy.TransactionAwareProactorStreamWorkQueueProcessingStrategyFactory;
 
 import org.openjdk.jmh.annotations.Benchmark;
+import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Level;
+import org.openjdk.jmh.annotations.Mode;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
@@ -38,6 +40,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.publisher.MonoSink;
 
 @State(Scope.Benchmark)
+@BenchmarkMode(Mode.Throughput)
 public class ProcessingStrategyBenchmark extends AbstractBenchmark {
 
   private MuleContext muleContext;
@@ -125,7 +128,7 @@ public class ProcessingStrategyBenchmark extends AbstractBenchmark {
         });
   }
 
-  @Benchmark
+  // @Benchmark
   @Threads(Threads.MAX)
   public CoreEvent directSink() {
     return Mono.<CoreEvent>create(resultSink -> {
@@ -141,7 +144,7 @@ public class ProcessingStrategyBenchmark extends AbstractBenchmark {
     }).block();
   }
 
-  @Benchmark
+  // @Benchmark
   @Threads(Threads.MAX)
   public CoreEvent workQueueSink() {
     return Mono.<CoreEvent>create(resultSink -> {
@@ -149,7 +152,7 @@ public class ProcessingStrategyBenchmark extends AbstractBenchmark {
     }).block();
   }
 
-  @Benchmark
+  // @Benchmark
   @Threads(1)
   public CoreEvent directPipeline() {
     return Mono.<CoreEvent>create(resultSink -> {
@@ -165,7 +168,7 @@ public class ProcessingStrategyBenchmark extends AbstractBenchmark {
     }).block();
   }
 
-  @Benchmark
+  // @Benchmark
   @Threads(1)
   public CoreEvent workQueuePipeline() {
     return Mono.<CoreEvent>create(resultSink -> {
@@ -173,7 +176,7 @@ public class ProcessingStrategyBenchmark extends AbstractBenchmark {
     }).block();
   }
 
-  @Benchmark
+  // @Benchmark
   @Threads(1)
   public CoreEvent directProcessor() {
     return Mono.<CoreEvent>create(resultSink -> {
@@ -189,7 +192,7 @@ public class ProcessingStrategyBenchmark extends AbstractBenchmark {
     }).block();
   }
 
-  @Benchmark
+  // @Benchmark
   @Threads(1)
   public CoreEvent workQueueProcessor() {
     return Mono.<CoreEvent>create(resultSink -> {
@@ -197,7 +200,7 @@ public class ProcessingStrategyBenchmark extends AbstractBenchmark {
     }).block();
   }
 
-  @Benchmark
+  // @Benchmark
   @Threads(Threads.MAX)
   public CoreEvent directAllSink() {
     return Mono.<CoreEvent>create(resultSink -> {
@@ -213,7 +216,7 @@ public class ProcessingStrategyBenchmark extends AbstractBenchmark {
     }).block();
   }
 
-  @Benchmark
+  // @Benchmark
   @Threads(Threads.MAX)
   public CoreEvent workQueueAllSink() {
     return Mono.<CoreEvent>create(resultSink -> {
