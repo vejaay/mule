@@ -14,6 +14,7 @@ import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.core.api.MuleContext;
 import org.mule.runtime.core.api.construct.Flow;
 import org.mule.runtime.core.api.event.CoreEvent;
+import org.mule.runtime.core.api.processor.ReactiveProcessor;
 import org.mule.runtime.core.api.processor.Sink;
 import org.mule.runtime.core.api.processor.strategy.ProcessingStrategy;
 import org.mule.runtime.core.internal.processor.strategy.DirectProcessingStrategyFactory;
@@ -26,6 +27,7 @@ import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.Threads;
+import org.openjdk.jmh.infra.Blackhole;
 import org.reactivestreams.Publisher;
 
 import java.util.function.Function;
@@ -75,36 +77,41 @@ public class ProcessingStrategyBenchmark extends AbstractBenchmark {
 
     flow = createFlow(muleContext);
 
-    directSink = directPs.createSink(flow, publisher -> baseFlux(publisher, p -> p));
-    emitterSink = emitterPs.createSink(flow, publisher -> baseFlux(publisher, p -> p));
-    workQueueSink = workQueuePs.createSink(flow, publisher -> baseFlux(publisher, p -> p));
+    final ReactiveProcessor processor = p -> Flux.from(p).doOnNext(e -> {
+      Blackhole.consumeCPU(100);
+    });
+
+    directSink = directPs.createSink(flow, publisher -> baseFlux(publisher, processor));
+    emitterSink = emitterPs.createSink(flow, publisher -> baseFlux(publisher, processor));
+    workQueueSink = workQueuePs.createSink(flow, publisher -> baseFlux(publisher, processor));
 
     Flux.<CoreEvent>create(s -> directPipeline = s, ERROR)
-        .transform(directPs.onPipeline(publisher -> baseFlux(publisher, p -> p)))
+        .transform(directPs.onPipeline(publisher -> baseFlux(publisher, processor)))
         .subscribe();
     Flux.<CoreEvent>create(s -> emitterPipeline = s, ERROR)
-        .transform(emitterPs.onPipeline(publisher -> baseFlux(publisher, p -> p)))
+        .transform(emitterPs.onPipeline(publisher -> baseFlux(publisher, processor)))
         .subscribe();
     Flux.<CoreEvent>create(s -> workQueuePipeline = s, ERROR)
-        .transform(workQueuePs.onPipeline(publisher -> baseFlux(publisher, p -> p)))
+        .transform(workQueuePs.onPipeline(publisher -> baseFlux(publisher, processor)))
         .subscribe();
 
     Flux.<CoreEvent>create(s -> directProcessor = s, ERROR)
-        .transform(directPs.onProcessor(publisher -> baseFlux(publisher, p -> p)))
+        .transform(directPs.onProcessor(publisher -> baseFlux(publisher, processor)))
         .subscribe();
     Flux.<CoreEvent>create(s -> emitterProcessor = s, ERROR)
-        .transform(emitterPs.onProcessor(publisher -> baseFlux(publisher, p -> p)))
+        .transform(emitterPs.onProcessor(publisher -> baseFlux(publisher, processor)))
         .subscribe();
     Flux.<CoreEvent>create(s -> workQueueProcessor = s, ERROR)
-        .transform(workQueuePs.onProcessor(publisher -> baseFlux(publisher, p -> p)))
+        .transform(workQueuePs.onProcessor(publisher -> baseFlux(publisher, processor)))
         .subscribe();
 
     directAllSink =
-        directPs.createSink(flow, publisher -> baseFlux(publisher, directPs.onPipeline(directPs.onProcessor(p -> p))));
+        directPs.createSink(flow, publisher -> baseFlux(publisher, directPs.onPipeline(directPs.onProcessor(processor))));
     emitterAllSink =
-        emitterPs.createSink(flow, publisher -> baseFlux(publisher, emitterPs.onPipeline(emitterPs.onProcessor(p -> p))));
+        emitterPs.createSink(flow, publisher -> baseFlux(publisher, emitterPs.onPipeline(emitterPs.onProcessor(processor))));
     workQueueAllSink =
-        workQueuePs.createSink(flow, publisher -> baseFlux(publisher, workQueuePs.onPipeline(workQueuePs.onProcessor(p -> p))));
+        workQueuePs.createSink(flow,
+                               publisher -> baseFlux(publisher, workQueuePs.onPipeline(workQueuePs.onProcessor(processor))));
 
   }
 
