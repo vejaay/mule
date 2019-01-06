@@ -75,9 +75,4 @@ public class DefaultReactorSink<E> implements ReactorSink<E> {
     fluxSink.complete();
     disposable.dispose();
   }
-
-  @Override
-  public final boolean isCancelled() {
-    return fluxSink.isCancelled();
-  }
 }

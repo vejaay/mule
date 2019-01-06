@@ -207,9 +207,5 @@ public abstract class ProactorStreamProcessingStrategy extends AbstractReactorSt
       innerSink.dispose();
     }
 
-    @Override
-    public boolean isCancelled() {
-      return innerSink.isCancelled();
-    }
   }
 }

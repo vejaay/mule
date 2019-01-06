@@ -6,13 +6,11 @@
  */
 package org.mule.runtime.core.internal.processor.strategy;
 
-import static java.lang.Integer.MAX_VALUE;
 import static java.lang.Long.max;
 import static java.lang.System.currentTimeMillis;
 import static java.lang.Thread.currentThread;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
-import static org.mule.runtime.core.api.lifecycle.LifecycleUtils.disposeIfNeeded;
 import static org.mule.runtime.core.api.processor.ReactiveProcessor.ProcessingType.BLOCKING;
 import static org.mule.runtime.core.api.processor.ReactiveProcessor.ProcessingType.CPU_INTENSIVE;
 import static org.mule.runtime.core.internal.context.thread.notification.ThreadNotificationLogger.THREAD_NOTIFICATION_LOGGER_CONTEXT_KEY;
@@ -23,7 +21,6 @@ import static reactor.core.scheduler.Schedulers.fromExecutorService;
 
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.exception.MuleRuntimeException;
-import org.mule.runtime.api.lifecycle.Disposable;
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.runtime.api.scheduler.SchedulerService;
 import org.mule.runtime.core.api.MuleContext;
@@ -36,17 +33,16 @@ import org.mule.runtime.core.api.processor.strategy.ProcessingStrategy;
 import org.mule.runtime.core.internal.context.thread.notification.ThreadLoggingExecutorServiceDecorator;
 import org.mule.runtime.core.internal.processor.strategy.sink.DefaultReactorSink;
 import org.mule.runtime.core.internal.processor.strategy.sink.ReactorSink;
+import org.mule.runtime.core.internal.processor.strategy.sink.RoundRobinReactorSink;
 
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.function.Supplier;
 
-import cn.danielw.fop.ObjectFactory;
-import cn.danielw.fop.ObjectPool;
-import cn.danielw.fop.PoolConfig;
-import cn.danielw.fop.Poolable;
 import reactor.core.publisher.EmitterProcessor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -56,7 +52,7 @@ import reactor.core.publisher.Mono;
  * de-multiplexing incoming events onto a multiple emitter using the {@link SchedulerService#cpuLightScheduler()} to process these
  * events from each emitter. In contrast to the {@link ReactorStreamProcessingStrategy} the proactor pattern treats
  * {@link ProcessingType#CPU_INTENSIVE} and {@link ProcessingType#BLOCKING} processors differently and schedules there execution
- * on dedicated {@link SchedulerService#cpuIntensiveScheduler()} and {@link SchedulerService#ioScheduler()} ()} schedulers.
+ * on dedicated {@link SchedulerService#cpuIntensiveScheduler()} and {@link SchedulerService#ioScheduler()} schedulers.
  * <p/>
  * This processing strategy is not suitable for transactional flows and will fail if used with an active transaction.
  *
@@ -140,55 +136,33 @@ public class ProactorStreamEmitterProcessingStrategyFactory extends ReactorStrea
     public Sink createSink(FlowConstruct flowConstruct, ReactiveProcessor function) {
       int concurrency = maxConcurrency < subscribers ? maxConcurrency : subscribers;
       final int perEmitterBuffersize = bufferSize / concurrency;
-
-      PoolConfig config = new PoolConfig()
-          .setPartitionSize(concurrency)
-          .setMaxSize(1)
-          .setMinSize(1)
-          .setMaxIdleMilliseconds(MAX_VALUE)
-          .setScavengeIntervalMilliseconds(0);
-
       final long shutdownTimeout = flowConstruct.getMuleContext().getConfiguration().getShutdownTimeout();
-      ObjectPool<ReactorSink<CoreEvent>> policySinkPool = new ObjectPool<>(config, new ObjectFactory<ReactorSink<CoreEvent>>() {
 
-        @Override
-        public ReactorSink<CoreEvent> create() {
-          CountDownLatch completionLatch = new CountDownLatch(1);
-          EmitterProcessor<CoreEvent> processor = EmitterProcessor.create(perEmitterBuffersize);
-          processor
-              .doOnSubscribe(subscription -> currentThread().setContextClassLoader(executionClassloader))
-              .transform(function)
-              .subscribe(null, e -> completionLatch.countDown(), () -> completionLatch.countDown());
+      final List<ReactorSink<CoreEvent>> sinks = new ArrayList<>();
 
-          return new DefaultReactorSink<>(processor.sink(), () -> {
-            long start = currentTimeMillis();
-            try {
-              if (!completionLatch.await(max(start - currentTimeMillis() + shutdownTimeout, 0l), MILLISECONDS)) {
-                LOGGER.warn("Subscribers of ProcessingStrategy for flow '{}' not completed in {} ms", flowConstruct.getName(),
-                            shutdownTimeout);
-              }
-            } catch (InterruptedException e) {
-              currentThread().interrupt();
-              throw new MuleRuntimeException(e);
+      for (int i = 0; i < concurrency; ++i) {
+        CountDownLatch completionLatch = new CountDownLatch(1);
+        EmitterProcessor<CoreEvent> processor = EmitterProcessor.create(perEmitterBuffersize);
+        processor
+            .doOnSubscribe(subscription -> currentThread().setContextClassLoader(executionClassloader))
+            .transform(function)
+            .subscribe(null, e -> completionLatch.countDown(), () -> completionLatch.countDown());
+
+        sinks.add(new DefaultReactorSink<>(processor.sink(), () -> {
+          long start = currentTimeMillis();
+          try {
+            if (!completionLatch.await(max(start - currentTimeMillis() + shutdownTimeout, 0l), MILLISECONDS)) {
+              LOGGER.warn("Subscribers of ProcessingStrategy for flow '{}' not completed in {} ms", flowConstruct.getName(),
+                          shutdownTimeout);
             }
-          }, createOnEventConsumer(), perEmitterBuffersize);
-        }
-
-        @Override
-        public void destroy(ReactorSink<CoreEvent> t) {
-          disposeIfNeeded(t, LOGGER);
-        }
-
-        @Override
-        public boolean validate(ReactorSink<CoreEvent> t) {
-          if (t.isCancelled()) {
-            LOGGER.warn("Emitter sink is cancelled. Will recreate it...");
+          } catch (InterruptedException e) {
+            currentThread().interrupt();
+            throw new MuleRuntimeException(e);
           }
-          return !t.isCancelled();
-        }
-      });
+        }, createOnEventConsumer(), perEmitterBuffersize));
+      }
 
-      return new ProactorSinkWrapper<>(new PooledReactorSink(policySinkPool));
+      return new ProactorSinkWrapper<>(new RoundRobinReactorSink<>(sinks));
     }
 
     @Override
@@ -222,50 +196,6 @@ public class ProactorStreamEmitterProcessingStrategyFactory extends ReactorStrea
     public void start() throws MuleException {
       super.start();
       pipelineScheduler = fromExecutorService(decorateScheduler(getCpuLightScheduler()));
-    }
-  }
-
-  static final class PooledReactorSink implements ReactorSink<CoreEvent>, Disposable {
-
-    private volatile boolean disposed = false;
-    private final ObjectPool<ReactorSink<CoreEvent>> policySinkPool;
-
-    public PooledReactorSink(ObjectPool<ReactorSink<CoreEvent>> policySinkPool) {
-      this.policySinkPool = policySinkPool;
-    }
-
-    @Override
-    public void accept(CoreEvent event) {
-      try (Poolable<ReactorSink<CoreEvent>> borrowedSink = policySinkPool.borrowObject()) {
-        borrowedSink.getObject().accept(event);
-      }
-    }
-
-    @Override
-    public boolean emit(CoreEvent event) {
-      try (Poolable<ReactorSink<CoreEvent>> borrowedSink = policySinkPool.borrowObject()) {
-        return borrowedSink.getObject().emit(event);
-      }
-    }
-
-    @Override
-    public void dispose() {
-      disposed = true;
-      try {
-        policySinkPool.shutdown();
-      } catch (InterruptedException e) {
-        currentThread().interrupt();
-      }
-    }
-
-    @Override
-    public CoreEvent intoSink(CoreEvent event) {
-      return event;
-    }
-
-    @Override
-    public boolean isCancelled() {
-      return disposed;
     }
   }
 

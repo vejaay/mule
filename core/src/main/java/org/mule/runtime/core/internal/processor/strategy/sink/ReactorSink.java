@@ -19,5 +19,4 @@ public interface ReactorSink<E> extends Sink, Disposable {
 
   E intoSink(CoreEvent event);
 
-  boolean isCancelled();
 }
