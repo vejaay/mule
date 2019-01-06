@@ -4,7 +4,7 @@
  * license, a copy of which has been included with this distribution in the
  * LICENSE.txt file.
  */
-package org.mule.runtime.core.internal.processor.strategy;
+package org.mule.runtime.core.internal.processor.strategy.sink;
 
 import static com.google.common.cache.CacheBuilder.newBuilder;
 import static java.lang.Thread.currentThread;
@@ -23,10 +23,10 @@ import java.util.function.Supplier;
 /**
  * {@link Sink} implementation that creates and caches a single {@link DirectSink} for each callee thread.
  */
-class PerThreadSink implements Sink, Disposable {
+public class PerThreadSink implements Sink, Disposable {
 
-  private Supplier<Sink> sinkSupplier;
-  private Cache<Thread, Sink> sinkCache =
+  private final Supplier<Sink> sinkSupplier;
+  private final Cache<Thread, Sink> sinkCache =
       newBuilder().weakValues().removalListener(notification -> disposeIfNeeded(notification.getValue(), NOP_LOGGER)).build();
 
   /**

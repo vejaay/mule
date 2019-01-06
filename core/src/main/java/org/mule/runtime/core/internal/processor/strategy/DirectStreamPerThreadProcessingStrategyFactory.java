@@ -17,6 +17,8 @@ import org.mule.runtime.core.api.processor.ReactiveProcessor.ProcessingType;
 import org.mule.runtime.core.api.processor.Sink;
 import org.mule.runtime.core.api.processor.strategy.ProcessingStrategy;
 import org.mule.runtime.core.api.processor.strategy.ProcessingStrategyFactory;
+import org.mule.runtime.core.internal.processor.strategy.sink.DirectSink;
+import org.mule.runtime.core.internal.processor.strategy.sink.PerThreadSink;
 
 /**
  * Processing strategy that processes the {@link Pipeline} in the caller thread and does not schedule the processing of any

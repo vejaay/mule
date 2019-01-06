@@ -4,7 +4,7 @@
  * license, a copy of which has been included with this distribution in the
  * LICENSE.txt file.
  */
-package org.mule.runtime.core.internal.processor.strategy;
+package org.mule.runtime.core.internal.processor.strategy.sink;
 
 import static org.mule.runtime.core.api.lifecycle.LifecycleUtils.disposeIfNeeded;
 import static org.mule.runtime.core.api.transaction.TransactionCoordination.isTransactionActive;
@@ -19,7 +19,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Delegate {@link Sink} that uses one of two {@link Sink}'s depending on if a transaction is in context or not.
  */
-final class TransactionalDelegateSink implements Sink, Disposable {
+public final class TransactionalDelegateSink implements Sink, Disposable {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TransactionalDelegateSink.class);
 

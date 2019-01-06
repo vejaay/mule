@@ -52,7 +52,7 @@ import org.mule.runtime.core.internal.management.stats.DefaultFlowConstructStati
 import org.mule.runtime.core.internal.policy.PolicyNextActionMessageProcessor;
 import org.mule.runtime.core.internal.processor.chain.InterceptedReactiveProcessor;
 import org.mule.runtime.core.internal.processor.strategy.AbstractProcessingStrategy;
-import org.mule.runtime.core.internal.processor.strategy.StreamPerEventSink;
+import org.mule.runtime.core.internal.processor.strategy.sink.StreamPerEventSink;
 
 import java.util.Optional;
 import java.util.concurrent.RejectedExecutionException;

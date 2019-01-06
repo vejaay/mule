@@ -10,11 +10,9 @@ import static org.mule.runtime.api.i18n.I18nMessageFactory.createStaticMessage;
 import static org.mule.runtime.core.api.exception.Errors.ComponentIdentifiers.Unhandleable.OVERLOAD;
 import static org.mule.runtime.core.api.rx.Exceptions.unwrap;
 import static org.mule.runtime.core.api.transaction.TransactionCoordination.isTransactionActive;
-import static org.mule.runtime.core.internal.processor.strategy.AbstractStreamProcessingStrategyFactory.CORES;
 import static reactor.util.concurrent.Queues.SMALL_BUFFER_SIZE;
 
 import org.mule.runtime.api.exception.DefaultMuleException;
-import org.mule.runtime.api.lifecycle.Disposable;
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.runtime.core.api.construct.FlowConstruct;
 import org.mule.runtime.core.api.event.CoreEvent;
@@ -22,13 +20,12 @@ import org.mule.runtime.core.api.processor.ReactiveProcessor;
 import org.mule.runtime.core.api.processor.Sink;
 import org.mule.runtime.core.api.processor.strategy.ProcessingStrategy;
 import org.mule.runtime.core.internal.exception.MessagingException;
+import org.mule.runtime.core.internal.processor.strategy.sink.DirectSink;
 import org.mule.runtime.core.privileged.event.BaseEventContext;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.function.Consumer;
-
-import reactor.core.publisher.FluxSink;
 
 /**
  * Abstract base {@link ProcessingStrategy} that creates a basic {@link Sink} that serializes events.
@@ -77,83 +74,6 @@ public abstract class AbstractProcessingStrategy implements ProcessingStrategy {
           .isPresent();
     } else {
       return false;
-    }
-  }
-
-  /**
-   * Extension of {@link Sink} using Reactor's {@link FluxSink} to accept events.
-   */
-  static interface ReactorSink<E> extends Sink, Disposable {
-
-    E intoSink(CoreEvent event);
-
-    boolean isCancelled();
-  }
-
-  /**
-   * Implementation of {@link Sink} using Reactor's {@link FluxSink} to accept events.
-   */
-  static class DefaultReactorSink<E> implements ReactorSink<E> {
-
-    private final FluxSink<E> fluxSink;
-    private final reactor.core.Disposable disposable;
-    private final Consumer<CoreEvent> onEventConsumer;
-    private final int bufferSize;
-
-    DefaultReactorSink(FluxSink<E> fluxSink, reactor.core.Disposable disposable,
-                       Consumer<CoreEvent> onEventConsumer, int bufferSize) {
-      this.fluxSink = fluxSink;
-      this.disposable = disposable;
-      this.onEventConsumer = onEventConsumer;
-      this.bufferSize = bufferSize;
-    }
-
-    @Override
-    public final void accept(CoreEvent event) {
-      onEventConsumer.accept(event);
-      fluxSink.next(intoSink(event));
-    }
-
-    @Override
-    public final boolean emit(CoreEvent event) {
-      onEventConsumer.accept(event);
-      // Optimization to avoid using synchronized block for all emissions.
-      // See: https://github.com/reactor/reactor-core/issues/1037
-      long remainingCapacity = fluxSink.requestedFromDownstream();
-      if (remainingCapacity == 0) {
-        return false;
-      } else if (remainingCapacity > (bufferSize > CORES * 4 ? CORES : 0)) {
-        // If there is sufficient room in buffer to significantly reduce change of concurrent emission when buffer is full then
-        // emit without synchronized block.
-        fluxSink.next(intoSink(event));
-        return true;
-      } else {
-        // If there is very little room in buffer also emit but synchronized.
-        synchronized (fluxSink) {
-          if (remainingCapacity > 0) {
-            fluxSink.next(intoSink(event));
-            return true;
-          } else {
-            return false;
-          }
-        }
-      }
-    }
-
-    @Override
-    public E intoSink(CoreEvent event) {
-      return (E) event;
-    }
-
-    @Override
-    public final void dispose() {
-      fluxSink.complete();
-      disposable.dispose();
-    }
-
-    @Override
-    public final boolean isCancelled() {
-      return fluxSink.isCancelled();
     }
   }
 }

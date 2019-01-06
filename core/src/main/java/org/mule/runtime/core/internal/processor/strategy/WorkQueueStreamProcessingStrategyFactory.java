@@ -42,6 +42,8 @@ import org.mule.runtime.core.api.processor.ReactiveProcessor;
 import org.mule.runtime.core.api.processor.Sink;
 import org.mule.runtime.core.api.processor.strategy.ProcessingStrategy;
 import org.mule.runtime.core.internal.context.thread.notification.ThreadLoggingExecutorServiceDecorator;
+import org.mule.runtime.core.internal.processor.strategy.sink.DefaultReactorSink;
+import org.mule.runtime.core.internal.processor.strategy.sink.ReactorSink;
 import org.mule.runtime.core.privileged.event.BaseEventContext;
 
 import org.slf4j.Logger;

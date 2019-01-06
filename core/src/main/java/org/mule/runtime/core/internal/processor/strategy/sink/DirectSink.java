@@ -4,14 +4,12 @@
  * license, a copy of which has been included with this distribution in the
  * LICENSE.txt file.
  */
-package org.mule.runtime.core.internal.processor.strategy;
+package org.mule.runtime.core.internal.processor.strategy.sink;
 
 import org.mule.runtime.api.lifecycle.Disposable;
 import org.mule.runtime.core.api.construct.Flow;
 import org.mule.runtime.core.api.event.CoreEvent;
 import org.mule.runtime.core.api.processor.Sink;
-import org.mule.runtime.core.internal.processor.strategy.AbstractProcessingStrategy.DefaultReactorSink;
-import org.mule.runtime.core.internal.processor.strategy.AbstractProcessingStrategy.ReactorSink;
 
 import org.reactivestreams.Publisher;
 
@@ -25,7 +23,7 @@ import reactor.core.publisher.EmitterProcessor;
  *
  * @since 4.0
  */
-class DirectSink implements Sink, Disposable {
+public class DirectSink implements Sink, Disposable {
 
   private final ReactorSink reactorSink;
 

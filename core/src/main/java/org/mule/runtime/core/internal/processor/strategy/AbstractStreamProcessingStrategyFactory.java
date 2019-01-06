@@ -25,10 +25,10 @@ import org.mule.runtime.core.api.processor.strategy.ProcessingStrategyFactory;
  *
  * @since 4.0
  */
-abstract class AbstractStreamProcessingStrategyFactory extends AbstractProcessingStrategyFactory {
+public abstract class AbstractStreamProcessingStrategyFactory extends AbstractProcessingStrategyFactory {
 
   protected static final String SYSTEM_PROPERTY_PREFIX = AbstractStreamProcessingStrategyFactory.class.getName() + ".";
-  protected static final int CORES = getInteger(SYSTEM_PROPERTY_PREFIX + "AVAILABLE_CORES", getRuntime().availableProcessors());
+  public static final int CORES = getInteger(SYSTEM_PROPERTY_PREFIX + "AVAILABLE_CORES", getRuntime().availableProcessors());
 
   protected static final int DEFAULT_BUFFER_SIZE = getInteger(SYSTEM_PROPERTY_PREFIX + "DEFAULT_BUFFER_SIZE", SMALL_BUFFER_SIZE);
 

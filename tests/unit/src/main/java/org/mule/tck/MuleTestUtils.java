@@ -31,7 +31,7 @@ import org.mule.runtime.core.api.processor.Sink;
 import org.mule.runtime.core.api.processor.strategy.ProcessingStrategy;
 import org.mule.runtime.core.internal.context.DefaultMuleContext;
 import org.mule.runtime.core.internal.context.MuleContextWithRegistry;
-import org.mule.runtime.core.internal.processor.strategy.StreamPerEventSink;
+import org.mule.runtime.core.internal.processor.strategy.sink.StreamPerEventSink;
 import org.mule.runtime.core.internal.registry.MuleRegistry;
 
 import org.mockito.Mockito;
