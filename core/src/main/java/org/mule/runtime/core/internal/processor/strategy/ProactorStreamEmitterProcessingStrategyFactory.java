@@ -14,6 +14,7 @@ import static org.mule.runtime.core.api.processor.ReactiveProcessor.ProcessingTy
 import static org.mule.runtime.core.api.processor.ReactiveProcessor.ProcessingType.CPU_INTENSIVE;
 import static org.mule.runtime.core.internal.context.thread.notification.ThreadNotificationLogger.THREAD_NOTIFICATION_LOGGER_CONTEXT_KEY;
 import static org.slf4j.LoggerFactory.getLogger;
+import static reactor.core.publisher.Flux.from;
 import static reactor.core.publisher.Flux.just;
 import static reactor.core.publisher.Mono.subscriberContext;
 import static reactor.core.scheduler.Schedulers.fromExecutorService;
@@ -45,10 +46,10 @@ import reactor.core.publisher.Mono;
 
 /**
  * Creates {@link ReactorProcessingStrategyFactory.ReactorProcessingStrategy} instance that implements the proactor pattern by
- * de-multiplexing incoming events onto a multiple emitter using the {@link SchedulerService#cpuLightScheduler()} to process
- * these events from each emitter. In contrast to the {@link ReactorStreamProcessingStrategy} the proactor pattern treats
+ * de-multiplexing incoming events onto a multiple emitter using the {@link SchedulerService#cpuLightScheduler()} to process these
+ * events from each emitter. In contrast to the {@link ReactorStreamProcessingStrategy} the proactor pattern treats
  * {@link ProcessingType#CPU_INTENSIVE} and {@link ProcessingType#BLOCKING} processors differently and schedules there execution
- * on dedicated {@link SchedulerService#cpuIntensiveScheduler()} and {@link SchedulerService#ioScheduler()} ()} schedulers.
+ * on dedicated {@link SchedulerService#cpuIntensiveScheduler()} and {@link SchedulerService#ioScheduler()} schedulers.
  * <p/>
  * This processing strategy is not suitable for transactional flows and will fail if used with an active transaction.
  *
@@ -129,13 +130,13 @@ public class ProactorStreamEmitterProcessingStrategyFactory extends ReactorStrea
     public Sink createSink(FlowConstruct flowConstruct, ReactiveProcessor function) {
       final long shutdownTimeout = flowConstruct.getMuleContext().getConfiguration().getShutdownTimeout();
       List<ReactorSink<CoreEvent>> sinks = new ArrayList<>();
-      int concurrency = maxConcurrency < subscribers ? maxConcurrency : subscribers;
-      reactor.core.scheduler.Scheduler scheduler = fromExecutorService(decorateScheduler(getCpuLightScheduler()));
+      int concurrency = maxConcurrency < CORES ? maxConcurrency : CORES;
       for (int i = 0; i < concurrency; i++) {
         Latch completionLatch = new Latch();
         EmitterProcessor<CoreEvent> processor = EmitterProcessor.create(bufferSize / concurrency);
-        processor.publishOn(scheduler).doOnSubscribe(subscription -> currentThread().setContextClassLoader(executionClassloader))
-            .transform(function).subscribe(null, e -> completionLatch.release(), () -> completionLatch.release());
+        processor
+            .transform(function)
+            .subscribe(null, e -> completionLatch.release(), () -> completionLatch.release());
 
         ReactorSink<CoreEvent> sink = new DefaultReactorSink<>(processor.sink(), () -> {
           long start = currentTimeMillis();
@@ -148,7 +149,7 @@ public class ProactorStreamEmitterProcessingStrategyFactory extends ReactorStrea
             currentThread().interrupt();
             throw new MuleRuntimeException(e);
           }
-        }, createOnEventConsumer(), bufferSize);
+        }, createOnEventConsumer(), bufferSize / concurrency);
         sinks.add(new ProactorSinkWrapper<>(sink));
       }
 
@@ -157,7 +158,8 @@ public class ProactorStreamEmitterProcessingStrategyFactory extends ReactorStrea
 
     @Override
     public ReactiveProcessor onPipeline(ReactiveProcessor pipeline) {
-      return pipeline;
+      reactor.core.scheduler.Scheduler scheduler = fromExecutorService(decorateScheduler(getCpuLightScheduler()));
+      return p -> from(p).publishOn(scheduler).transform(pipeline);
     }
 
     @Override
