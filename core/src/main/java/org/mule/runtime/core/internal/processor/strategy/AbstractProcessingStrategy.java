@@ -6,8 +6,10 @@
  */
 package org.mule.runtime.core.internal.processor.strategy;
 
+import static java.util.Objects.requireNonNull;
 import static org.mule.runtime.api.i18n.I18nMessageFactory.createStaticMessage;
 import static org.mule.runtime.core.api.exception.Errors.ComponentIdentifiers.Unhandleable.OVERLOAD;
+import static org.mule.runtime.core.api.lifecycle.LifecycleUtils.disposeIfNeeded;
 import static org.mule.runtime.core.api.rx.Exceptions.unwrap;
 import static org.mule.runtime.core.api.transaction.TransactionCoordination.isTransactionActive;
 import static org.mule.runtime.core.internal.processor.strategy.AbstractStreamProcessingStrategyFactory.CORES;
@@ -24,9 +26,13 @@ import org.mule.runtime.core.api.processor.strategy.ProcessingStrategy;
 import org.mule.runtime.core.internal.exception.MessagingException;
 import org.mule.runtime.core.privileged.event.BaseEventContext;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 import reactor.core.publisher.FluxSink;
 
@@ -94,28 +100,56 @@ public abstract class AbstractProcessingStrategy implements ProcessingStrategy {
    */
   static class DefaultReactorSink<E> implements ReactorSink<E> {
 
-    private final FluxSink<E> fluxSink;
+    private static final Logger LOGGER = LoggerFactory.getLogger(DefaultReactorSink.class);
+
+    private final Supplier<FluxSink<E>> fluxSinkSupplier;
     private final reactor.core.Disposable disposable;
     private final Consumer onEventConsumer;
     private final int bufferSize;
 
-    DefaultReactorSink(FluxSink<E> fluxSink, reactor.core.Disposable disposable,
+    DefaultReactorSink(Supplier<FluxSink<E>> fluxSinkSupplier, reactor.core.Disposable disposable,
                        Consumer<CoreEvent> onEventConsumer, int bufferSize) {
-      this.fluxSink = fluxSink;
+      this.fluxSinkSupplier = fluxSinkSupplier;
       this.disposable = disposable;
       this.onEventConsumer = onEventConsumer;
       this.bufferSize = bufferSize;
     }
 
+    DefaultReactorSink(FluxSink<E> fluxSink, reactor.core.Disposable disposable,
+                       Consumer<CoreEvent> onEventConsumer, int bufferSize) {
+      this(new SingleFluxSinkSupplier<>(fluxSink), disposable, onEventConsumer, bufferSize);
+    }
+
+    private final static class SingleFluxSinkSupplier<E> implements Supplier<FluxSink<E>>, Disposable {
+
+      private final FluxSink<E> fluxSink;
+
+      public SingleFluxSinkSupplier(FluxSink<E> fluxSink) {
+        this.fluxSink = requireNonNull(fluxSink);
+      }
+
+      @Override
+      public FluxSink<E> get() {
+        return fluxSink;
+      }
+
+      @Override
+      public void dispose() {
+        fluxSink.complete();
+      }
+
+    }
+
     @Override
     public final void accept(CoreEvent event) {
       onEventConsumer.accept(event);
-      fluxSink.next(intoSink(event));
+      fluxSinkSupplier.get().next(intoSink(event));
     }
 
     @Override
     public final boolean emit(CoreEvent event) {
       onEventConsumer.accept(event);
+      FluxSink<E> fluxSink = fluxSinkSupplier.get();
       // Optimization to avoid using synchronized block for all emissions.
       // See: https://github.com/reactor/reactor-core/issues/1037
       long remainingCapacity = fluxSink.requestedFromDownstream();
@@ -146,7 +180,7 @@ public abstract class AbstractProcessingStrategy implements ProcessingStrategy {
 
     @Override
     public final void dispose() {
-      fluxSink.complete();
+      disposeIfNeeded(fluxSinkSupplier, LOGGER);
       disposable.dispose();
     }
 

@@ -14,7 +14,6 @@ import static org.mule.runtime.core.api.processor.ReactiveProcessor.ProcessingTy
 import static org.mule.runtime.core.api.processor.ReactiveProcessor.ProcessingType.CPU_INTENSIVE;
 import static org.mule.runtime.core.internal.context.thread.notification.ThreadNotificationLogger.THREAD_NOTIFICATION_LOGGER_CONTEXT_KEY;
 import static org.slf4j.LoggerFactory.getLogger;
-import static reactor.core.publisher.Flux.from;
 import static reactor.core.publisher.Flux.just;
 import static reactor.core.publisher.Mono.subscriberContext;
 import static reactor.core.scheduler.Schedulers.fromExecutorService;
@@ -22,7 +21,6 @@ import static reactor.core.scheduler.Schedulers.fromExecutorService;
 import org.mule.runtime.api.exception.MuleRuntimeException;
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.runtime.api.scheduler.SchedulerService;
-import org.mule.runtime.api.util.concurrent.Latch;
 import org.mule.runtime.core.api.MuleContext;
 import org.mule.runtime.core.api.construct.FlowConstruct;
 import org.mule.runtime.core.api.event.CoreEvent;
@@ -31,13 +29,11 @@ import org.mule.runtime.core.api.processor.ReactiveProcessor.ProcessingType;
 import org.mule.runtime.core.api.processor.Sink;
 import org.mule.runtime.core.api.processor.strategy.ProcessingStrategy;
 import org.mule.runtime.core.internal.context.thread.notification.ThreadLoggingExecutorServiceDecorator;
+import org.mule.runtime.core.internal.util.rx.RoundRobinFluxSinkSupplier;
 
 import org.slf4j.Logger;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.IntUnaryOperator;
+import java.util.concurrent.CountDownLatch;
 import java.util.function.Supplier;
 
 import reactor.core.publisher.EmitterProcessor;
@@ -129,37 +125,36 @@ public class ProactorStreamEmitterProcessingStrategyFactory extends ReactorStrea
     @Override
     public Sink createSink(FlowConstruct flowConstruct, ReactiveProcessor function) {
       final long shutdownTimeout = flowConstruct.getMuleContext().getConfiguration().getShutdownTimeout();
-      List<ReactorSink<CoreEvent>> sinks = new ArrayList<>();
       int concurrency = maxConcurrency < CORES ? maxConcurrency : CORES;
-      for (int i = 0; i < concurrency; i++) {
-        Latch completionLatch = new Latch();
+      reactor.core.scheduler.Scheduler scheduler = fromExecutorService(decorateScheduler(getCpuLightScheduler()));
+
+      CountDownLatch completionLatch = new CountDownLatch(concurrency);
+
+      return new ProactorSinkWrapper<>(new DefaultReactorSink<>(new RoundRobinFluxSinkSupplier<>(concurrency, () -> {
         EmitterProcessor<CoreEvent> processor = EmitterProcessor.create(bufferSize / concurrency);
         processor
+            .publishOn(scheduler)
             .transform(function)
-            .subscribe(null, e -> completionLatch.release(), () -> completionLatch.release());
+            .subscribe(null, e -> completionLatch.countDown(), () -> completionLatch.countDown());
 
-        ReactorSink<CoreEvent> sink = new DefaultReactorSink<>(processor.sink(), () -> {
-          long start = currentTimeMillis();
-          try {
-            if (!completionLatch.await(max(start - currentTimeMillis() + shutdownTimeout, 0l), MILLISECONDS)) {
-              LOGGER.warn("Subscribers of ProcessingStrategy for flow '{}' not completed in {} ms", flowConstruct.getName(),
-                          shutdownTimeout);
-            }
-          } catch (InterruptedException e) {
-            currentThread().interrupt();
-            throw new MuleRuntimeException(e);
+        return processor.sink();
+      }), () -> {
+        long start = currentTimeMillis();
+        try {
+          if (!completionLatch.await(max(start - currentTimeMillis() + shutdownTimeout, 0l), MILLISECONDS)) {
+            LOGGER.warn("Subscribers of ProcessingStrategy for flow '{}' not completed in {} ms", flowConstruct.getName(),
+                        shutdownTimeout);
           }
-        }, createOnEventConsumer(), bufferSize / concurrency);
-        sinks.add(new ProactorSinkWrapper<>(sink));
-      }
-
-      return new RoundRobinReactorSink<>(sinks);
+        } catch (InterruptedException e) {
+          currentThread().interrupt();
+          throw new MuleRuntimeException(e);
+        }
+      }, createOnEventConsumer(), bufferSize));
     }
 
     @Override
     public ReactiveProcessor onPipeline(ReactiveProcessor pipeline) {
-      reactor.core.scheduler.Scheduler scheduler = fromExecutorService(decorateScheduler(getCpuLightScheduler()));
-      return p -> from(p).publishOn(scheduler).transform(pipeline);
+      return pipeline;
     }
 
     @Override
@@ -182,43 +177,6 @@ public class ProactorStreamEmitterProcessingStrategyFactory extends ReactorStrea
       }
     }
 
-  }
-
-  static class RoundRobinReactorSink<E> implements AbstractProcessingStrategy.ReactorSink<E> {
-
-    private final List<AbstractProcessingStrategy.ReactorSink<E>> fluxSinks;
-    private final AtomicInteger index = new AtomicInteger(0);
-    // Saving update function to avoid creating the lambda every time
-    private final IntUnaryOperator update;
-
-    public RoundRobinReactorSink(List<AbstractProcessingStrategy.ReactorSink<E>> sinks) {
-      this.fluxSinks = sinks;
-      this.update = (value) -> (value + 1) % fluxSinks.size();
-    }
-
-    @Override
-    public void dispose() {
-      fluxSinks.stream().forEach(sink -> sink.dispose());
-    }
-
-    @Override
-    public void accept(CoreEvent event) {
-      fluxSinks.get(nextIndex()).accept(event);
-    }
-
-    private int nextIndex() {
-      return index.getAndUpdate(update);
-    }
-
-    @Override
-    public boolean emit(CoreEvent event) {
-      return fluxSinks.get(nextIndex()).emit(event);
-    }
-
-    @Override
-    public E intoSink(CoreEvent event) {
-      return (E) event;
-    }
   }
 
 }
