@@ -129,7 +129,7 @@ public class ProactorStreamEmitterProcessingStrategyFactory extends ReactorStrea
     public Sink createSink(FlowConstruct flowConstruct, ReactiveProcessor function) {
       final long shutdownTimeout = flowConstruct.getMuleContext().getConfiguration().getShutdownTimeout();
       List<ReactorSink<CoreEvent>> sinks = new ArrayList<>();
-      int concurrency = maxConcurrency < subscribers ? maxConcurrency : subscribers;
+      int concurrency = maxConcurrency < CORES ? maxConcurrency : CORES;
       reactor.core.scheduler.Scheduler scheduler = fromExecutorService(decorateScheduler(getCpuLightScheduler()));
       for (int i = 0; i < concurrency; i++) {
         Latch completionLatch = new Latch();
@@ -148,7 +148,7 @@ public class ProactorStreamEmitterProcessingStrategyFactory extends ReactorStrea
             currentThread().interrupt();
             throw new MuleRuntimeException(e);
           }
-        }, createOnEventConsumer(), bufferSize);
+        }, createOnEventConsumer(), bufferSize / concurrency);
         sinks.add(new ProactorSinkWrapper<>(sink));
       }
 
