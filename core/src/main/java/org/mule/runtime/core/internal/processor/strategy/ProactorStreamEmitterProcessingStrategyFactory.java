@@ -21,6 +21,7 @@ import static reactor.core.scheduler.Schedulers.fromExecutorService;
 import org.mule.runtime.api.exception.MuleRuntimeException;
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.runtime.api.scheduler.SchedulerService;
+import org.mule.runtime.api.util.concurrent.Latch;
 import org.mule.runtime.core.api.MuleContext;
 import org.mule.runtime.core.api.construct.FlowConstruct;
 import org.mule.runtime.core.api.event.CoreEvent;
@@ -29,11 +30,13 @@ import org.mule.runtime.core.api.processor.ReactiveProcessor.ProcessingType;
 import org.mule.runtime.core.api.processor.Sink;
 import org.mule.runtime.core.api.processor.strategy.ProcessingStrategy;
 import org.mule.runtime.core.internal.context.thread.notification.ThreadLoggingExecutorServiceDecorator;
-import org.mule.runtime.core.internal.util.rx.RoundRobinFluxSinkSupplier;
 
 import org.slf4j.Logger;
 
-import java.util.concurrent.CountDownLatch;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.IntUnaryOperator;
 import java.util.function.Supplier;
 
 import reactor.core.publisher.EmitterProcessor;
@@ -42,10 +45,10 @@ import reactor.core.publisher.Mono;
 
 /**
  * Creates {@link ReactorProcessingStrategyFactory.ReactorProcessingStrategy} instance that implements the proactor pattern by
- * de-multiplexing incoming events onto a multiple emitter using the {@link SchedulerService#cpuLightScheduler()} to process these
- * events from each emitter. In contrast to the {@link ReactorStreamProcessingStrategy} the proactor pattern treats
+ * de-multiplexing incoming events onto a multiple emitter using the {@link SchedulerService#cpuLightScheduler()} to process
+ * these events from each emitter. In contrast to the {@link ReactorStreamProcessingStrategy} the proactor pattern treats
  * {@link ProcessingType#CPU_INTENSIVE} and {@link ProcessingType#BLOCKING} processors differently and schedules there execution
- * on dedicated {@link SchedulerService#cpuIntensiveScheduler()} and {@link SchedulerService#ioScheduler()} schedulers.
+ * on dedicated {@link SchedulerService#cpuIntensiveScheduler()} and {@link SchedulerService#ioScheduler()} ()} schedulers.
  * <p/>
  * This processing strategy is not suitable for transactional flows and will fail if used with an active transaction.
  *
@@ -125,31 +128,31 @@ public class ProactorStreamEmitterProcessingStrategyFactory extends ReactorStrea
     @Override
     public Sink createSink(FlowConstruct flowConstruct, ReactiveProcessor function) {
       final long shutdownTimeout = flowConstruct.getMuleContext().getConfiguration().getShutdownTimeout();
-      int concurrency = maxConcurrency < CORES ? maxConcurrency : CORES;
+      List<ReactorSink<CoreEvent>> sinks = new ArrayList<>();
+      int concurrency = maxConcurrency < subscribers ? maxConcurrency : subscribers;
       reactor.core.scheduler.Scheduler scheduler = fromExecutorService(decorateScheduler(getCpuLightScheduler()));
-
-      CountDownLatch completionLatch = new CountDownLatch(concurrency);
-
-      return new ProactorSinkWrapper<>(new DefaultReactorSink<>(new RoundRobinFluxSinkSupplier<>(concurrency, () -> {
+      for (int i = 0; i < concurrency; i++) {
+        Latch completionLatch = new Latch();
         EmitterProcessor<CoreEvent> processor = EmitterProcessor.create(bufferSize / concurrency);
-        processor
-            .publishOn(scheduler)
-            .transform(function)
-            .subscribe(null, e -> completionLatch.countDown(), () -> completionLatch.countDown());
+        processor.publishOn(scheduler).doOnSubscribe(subscription -> currentThread().setContextClassLoader(executionClassloader))
+            .transform(function).subscribe(null, e -> completionLatch.release(), () -> completionLatch.release());
 
-        return processor.sink();
-      }), () -> {
-        long start = currentTimeMillis();
-        try {
-          if (!completionLatch.await(max(start - currentTimeMillis() + shutdownTimeout, 0l), MILLISECONDS)) {
-            LOGGER.warn("Subscribers of ProcessingStrategy for flow '{}' not completed in {} ms", flowConstruct.getName(),
-                        shutdownTimeout);
+        ReactorSink<CoreEvent> sink = new DefaultReactorSink<>(processor.sink(), () -> {
+          long start = currentTimeMillis();
+          try {
+            if (!completionLatch.await(max(start - currentTimeMillis() + shutdownTimeout, 0l), MILLISECONDS)) {
+              LOGGER.warn("Subscribers of ProcessingStrategy for flow '{}' not completed in {} ms", flowConstruct.getName(),
+                          shutdownTimeout);
+            }
+          } catch (InterruptedException e) {
+            currentThread().interrupt();
+            throw new MuleRuntimeException(e);
           }
-        } catch (InterruptedException e) {
-          currentThread().interrupt();
-          throw new MuleRuntimeException(e);
-        }
-      }, createOnEventConsumer(), bufferSize));
+        }, createOnEventConsumer(), bufferSize);
+        sinks.add(new ProactorSinkWrapper<>(sink));
+      }
+
+      return new RoundRobinReactorSink<>(sinks);
     }
 
     @Override
@@ -177,6 +180,43 @@ public class ProactorStreamEmitterProcessingStrategyFactory extends ReactorStrea
       }
     }
 
+  }
+
+  static class RoundRobinReactorSink<E> implements AbstractProcessingStrategy.ReactorSink<E> {
+
+    private final List<AbstractProcessingStrategy.ReactorSink<E>> fluxSinks;
+    private final AtomicInteger index = new AtomicInteger(0);
+    // Saving update function to avoid creating the lambda every time
+    private final IntUnaryOperator update;
+
+    public RoundRobinReactorSink(List<AbstractProcessingStrategy.ReactorSink<E>> sinks) {
+      this.fluxSinks = sinks;
+      this.update = (value) -> (value + 1) % fluxSinks.size();
+    }
+
+    @Override
+    public void dispose() {
+      fluxSinks.stream().forEach(sink -> sink.dispose());
+    }
+
+    @Override
+    public void accept(CoreEvent event) {
+      fluxSinks.get(nextIndex()).accept(event);
+    }
+
+    private int nextIndex() {
+      return index.getAndUpdate(update);
+    }
+
+    @Override
+    public boolean emit(CoreEvent event) {
+      return fluxSinks.get(nextIndex()).emit(event);
+    }
+
+    @Override
+    public E intoSink(CoreEvent event) {
+      return (E) event;
+    }
   }
 
 }
