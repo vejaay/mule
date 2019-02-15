@@ -31,7 +31,7 @@ import java.util.Optional;
  */
 public abstract class AbstractExecutionContextAdapterDecorator<M extends ComponentModel> implements ExecutionContextAdapter<M> {
 
-  private final ExecutionContextAdapter<M> decorated;
+  private ExecutionContextAdapter<M> decorated;
 
   public AbstractExecutionContextAdapterDecorator(ExecutionContextAdapter<M> decorated) {
     this.decorated = decorated;
