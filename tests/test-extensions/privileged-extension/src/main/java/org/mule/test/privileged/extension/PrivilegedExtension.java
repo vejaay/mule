@@ -13,7 +13,6 @@ import org.mule.runtime.extension.api.annotation.privileged.DeclarationEnrichers
 @Extension(name = "privileged")
 @Operations(PrivilegedOperations.class)
 @DeclarationEnrichers({ErrorEnricher.class, EmptyEnricher.class, ChainErrorEnricher.class, ChainEmptyEnricher.class})
-// @Xml(namespace = "http://www.mulesoft.org/schema/mule/privileged", prefix = "privileged")
 public class PrivilegedExtension {
 
 }

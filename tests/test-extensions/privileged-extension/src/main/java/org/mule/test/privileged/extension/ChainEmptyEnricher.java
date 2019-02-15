@@ -16,7 +16,7 @@ public class ChainEmptyEnricher implements DeclarationEnricher {
   @Override
   public void enrich(ExtensionLoadingContext extensionLoadingContext) {
     extensionLoadingContext.getExtensionDeclarer().getDeclaration().getOperations().stream()
-        .filter(operation -> operation.getName().equals("chain-empty"))
+        .filter(operation -> operation.getName().equals("chainEmpty"))
         .findFirst()
         .ifPresent(operation -> operation
             .addModelProperty(new ComponentExecutorModelProperty((model, params) -> new ChainEmptyExecutor())));

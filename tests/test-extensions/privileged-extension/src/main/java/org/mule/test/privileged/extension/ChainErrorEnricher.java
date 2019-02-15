@@ -16,7 +16,7 @@ public class ChainErrorEnricher implements DeclarationEnricher {
   @Override
   public void enrich(ExtensionLoadingContext extensionLoadingContext) {
     extensionLoadingContext.getExtensionDeclarer().getDeclaration().getOperations().stream()
-        .filter(operation -> operation.getName().equals("chain-error"))
+        .filter(operation -> operation.getName().equals("chainError"))
         .findFirst()
         .ifPresent(operation -> operation
             .addModelProperty(new ComponentExecutorModelProperty((model, params) -> new ChainErrorExecutor())));
