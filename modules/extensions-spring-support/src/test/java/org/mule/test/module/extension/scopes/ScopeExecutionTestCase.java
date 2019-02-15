@@ -12,8 +12,10 @@ import static org.hamcrest.CoreMatchers.instanceOf;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.CoreMatchers.sameInstance;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.core.IsNot.not;
 import static org.junit.Assert.assertThat;
+import static org.mule.tck.junit4.matcher.ErrorTypeMatcher.errorType;
 
 import org.mule.runtime.api.connection.ConnectionException;
 import org.mule.runtime.api.scheduler.Scheduler;
@@ -24,13 +26,13 @@ import org.mule.runtime.core.api.util.ClassUtils;
 import org.mule.tck.junit4.rule.SystemProperty;
 import org.mule.test.module.extension.AbstractExtensionFunctionalTestCase;
 
-import javax.inject.Inject;
-
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+
+import javax.inject.Inject;
 
 public class ScopeExecutionTestCase extends AbstractExtensionFunctionalTestCase {
 
@@ -144,6 +146,19 @@ public class ScopeExecutionTestCase extends AbstractExtensionFunctionalTestCase 
     String expected = "Killed the following because I'm the one who knocks:";
 
     assertThat(event.getMessage().getPayload().getValue(), is(expected));
+  }
+
+  @Test
+  public void anythingRaiseError() throws Exception {
+    flowRunner("executeAnythingRaiseError")
+        .withPayload("Killed the following because I'm the one who knocks:")
+        .runExpectingException(errorType("MULE", "ROUTING"));
+  }
+
+  @Test
+  public void anythingException() throws Exception {
+    expectedException.expectMessage(containsString("Expected exception"));
+    flowRunner("executeAnythingException").withPayload("Killed the following because I'm the one who knocks:").run();
   }
 
   @Test

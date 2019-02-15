@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:privileged="http://www.mulesoft.org/schema/mule/privileged"
+      xmlns="http://www.mulesoft.org/schema/mule/core"
+      xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+               http://www.mulesoft.org/schema/mule/privileged http://www.mulesoft.org/schema/mule/privileged/current/mule-privileged.xsd">
+
+    <flow name="empty">
+        <privileged:empty/>
+    </flow>
+
+    <flow name="error">
+        <privileged:error/>
+    </flow>
+
+    <flow name="emptyChain">
+        <privileged:chain-empty>
+            <logger/>
+        </privileged:chain-empty>
+    </flow>
+
+    <flow name="errorChain">
+        <privileged:chain-error>
+            <logger/>
+        </privileged:chain-error>
+    </flow>
+</mule>

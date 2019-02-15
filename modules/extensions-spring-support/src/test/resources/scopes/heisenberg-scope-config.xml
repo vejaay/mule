@@ -2,10 +2,12 @@
 <mule xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xmlns:heisenberg="http://www.mulesoft.org/schema/mule/heisenberg"
       xmlns:petstore="http://www.mulesoft.org/schema/mule/petstore"
+      xmlns:test="http://www.mulesoft.org/schema/mule/test"
       xmlns="http://www.mulesoft.org/schema/mule/core"
       xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
                http://www.mulesoft.org/schema/mule/heisenberg http://www.mulesoft.org/schema/mule/heisenberg/current/mule-heisenberg.xsd
-               http://www.mulesoft.org/schema/mule/petstore http://www.mulesoft.org/schema/mule/petstore/current/mule-petstore.xsd">
+               http://www.mulesoft.org/schema/mule/petstore http://www.mulesoft.org/schema/mule/petstore/current/mule-petstore.xsd
+               http://www.mulesoft.org/schema/mule/test http://www.mulesoft.org/schema/mule/test/current/mule-test.xsd">
     <configuration-properties file="heisenberg.properties"/>
 
     <heisenberg:config name="heisenberg"
@@ -41,6 +43,22 @@
         <heisenberg:execute-anything>
             <try>
                 <set-payload value="New Payload"/>
+            </try>
+        </heisenberg:execute-anything>
+    </flow>
+
+    <flow name="executeAnythingRaiseError">
+        <heisenberg:execute-anything>
+            <try>
+                <raise-error type="ROUTING"/>
+            </try>
+        </heisenberg:execute-anything>
+    </flow>
+
+    <flow name="executeAnythingException">
+        <heisenberg:execute-anything>
+            <try>
+                <test:processor throwException="true" exceptionText="Expected exception"/>
             </try>
         </heisenberg:execute-anything>
     </flow>
