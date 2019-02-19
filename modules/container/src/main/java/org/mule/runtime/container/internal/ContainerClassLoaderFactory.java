@@ -26,8 +26,6 @@ import org.mule.runtime.module.artifact.api.classloader.LookupStrategy;
 import org.mule.runtime.module.artifact.api.classloader.MuleArtifactClassLoader;
 import org.mule.runtime.module.artifact.api.descriptor.ArtifactDescriptor;
 
-import com.google.common.collect.ImmutableSet;
-
 import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
@@ -38,6 +36,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import com.google.common.collect.ImmutableSet;
+import org.apache.commons.lang3.JavaVersion;
+import org.apache.commons.lang3.SystemUtils;
 
 /**
  * Creates the classLoader for the Mule container.
@@ -85,9 +87,10 @@ public class ContainerClassLoaderFactory {
   /**
    * Boot packages define all the prefixes that must be loaded from the container classLoader without being filtered
    */
+  // MULE-10194 Mechanism to add custom boot packages to be exported by the container
   public static final Set<String> BOOT_PACKAGES =
-      ImmutableSet.of(// MULE-10194 Mechanism to add custom boot packages to be exported by the container
-                      "com.yourkit");
+      SystemUtils.isJavaVersionAtLeast(JavaVersion.JAVA_11) ? ImmutableSet.of("com.yourkit", "javax.activation")
+          : ImmutableSet.of("com.yourkit");
 
   private final ModuleRepository moduleRepository;
 
