@@ -18,6 +18,7 @@ import static org.mule.runtime.module.artifact.api.classloader.ParentFirstLookup
 import org.mule.runtime.container.api.ModuleRepository;
 import org.mule.runtime.container.api.MuleModule;
 import org.mule.runtime.core.internal.util.EnumerationAdapter;
+import org.mule.runtime.core.internal.util.JdkVersionUtils;
 import org.mule.runtime.module.artifact.api.classloader.ArtifactClassLoader;
 import org.mule.runtime.module.artifact.api.classloader.ClassLoaderLookupPolicy;
 import org.mule.runtime.module.artifact.api.classloader.ExportedService;
@@ -85,9 +86,22 @@ public class ContainerClassLoaderFactory {
   /**
    * Boot packages define all the prefixes that must be loaded from the container classLoader without being filtered
    */
-  public static final Set<String> BOOT_PACKAGES =
+  public static Set<String> BOOT_PACKAGES =
       ImmutableSet.of(// MULE-10194 Mechanism to add custom boot packages to be exported by the container
                       "com.yourkit");
+
+  //{
+  //  if (JdkVersionUtils.getJdkVersion().getMajor() > 8) {
+  //    BOOT_PACKAGES =
+  //        ImmutableSet.of(// MULE-10194 Mechanism to add custom boot packages to be exported by the container
+  //                        "com.yourkit", "javax.activation", "javax.mail", "javax.xml", "com.sun.mail");
+  //  } else {
+  //    BOOT_PACKAGES =
+  //        ImmutableSet.of(// MULE-10194 Mechanism to add custom boot packages to be exported by the container
+  //                        "com.yourkit");
+  //  }
+  //}
+
 
   private final ModuleRepository moduleRepository;
 

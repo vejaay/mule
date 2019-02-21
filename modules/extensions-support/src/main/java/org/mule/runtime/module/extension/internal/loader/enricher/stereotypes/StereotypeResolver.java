@@ -19,6 +19,7 @@ import org.mule.runtime.api.meta.model.declaration.fluent.BaseDeclaration;
 import org.mule.runtime.api.meta.model.declaration.fluent.WithStereotypesDeclaration;
 import org.mule.runtime.api.meta.model.stereotype.StereotypeModel;
 import org.mule.runtime.api.meta.model.stereotype.StereotypeModelBuilder;
+import org.mule.runtime.api.util.FunctionalUtils;
 import org.mule.runtime.extension.api.annotation.param.stereotype.Stereotype;
 import org.mule.runtime.extension.api.annotation.param.stereotype.Validator;
 import org.mule.runtime.extension.api.exception.IllegalModelDefinitionException;
@@ -59,7 +60,8 @@ public abstract class StereotypeResolver<T extends WithAnnotations> {
   protected static StereotypeModel getStereotype(StereotypeDefinition stereotypeDefinition,
                                                  String namespace,
                                                  Map<StereotypeDefinition, StereotypeModel> stereotypesCache) {
-    return computeIfAbsent(stereotypesCache, stereotypeDefinition, definition -> {
+
+    return FunctionalUtils.computeIfAbsent(stereotypesCache, stereotypeDefinition, definition -> {
 
       if (!isValidStereotype(stereotypeDefinition, namespace)) {
         throw new IllegalModelDefinitionException(format(
